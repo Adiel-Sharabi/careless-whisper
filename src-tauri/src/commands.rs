@@ -4,6 +4,37 @@ use crate::config::settings::Settings;
 use crate::models::downloader::{self, ModelInfo};
 use crate::AppState;
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+fn position_overlay(
+    win: &tauri::WebviewWindow,
+    position: &crate::config::settings::OverlayPosition,
+) {
+    use crate::config::settings::OverlayPosition;
+    use tauri::PhysicalPosition;
+
+    let monitor = match win.current_monitor() {
+        Ok(Some(m)) => m,
+        _ => return,
+    };
+    let screen = monitor.size();
+    let scale = monitor.scale_factor();
+    let win_width = (280.0 * scale) as i32;
+    let menu_bar_offset = (40.0 * scale) as i32;
+    let margin = (16.0 * scale) as i32;
+    let screen_w = screen.width as i32;
+    let screen_h = screen.height as i32;
+
+    let (x, y) = match position {
+        OverlayPosition::TopLeft => (margin, menu_bar_offset),
+        OverlayPosition::TopRight => (screen_w - win_width - margin, menu_bar_offset),
+        OverlayPosition::BottomCenter => ((screen_w - win_width) / 2, screen_h - (120.0 * scale) as i32),
+        OverlayPosition::TopCenter => ((screen_w - win_width) / 2, menu_bar_offset),
+    };
+
+    let _ = win.set_position(PhysicalPosition::new(x, y));
+}
+
 // ── Recording ────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -17,6 +48,7 @@ pub async fn start_recording(
     *state.recording.lock().unwrap() = Some(handle);
 
     if let Some(win) = app.get_webview_window("overlay") {
+        position_overlay(&win, &state.settings.lock().unwrap().overlay_position);
         let _ = win.show();
     }
 
