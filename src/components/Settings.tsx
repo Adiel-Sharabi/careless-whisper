@@ -16,9 +16,11 @@ export function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [launchAtLogin, setLaunchAtLogin] = useState(false);
 
   useEffect(() => {
     invoke<Settings>("get_settings").then(setSettings);
+    invoke<boolean>("get_launch_at_login").then(setLaunchAtLogin).catch(() => {});
   }, []);
 
   const save = async () => {
@@ -148,21 +150,20 @@ export function Settings() {
           />
         </div>
         <div className="settings-toggle">
-          <span style={{ color: "#8e8e93" }}>
-            Launch at login
-            <span
-              style={{
-                fontSize: 11,
-                marginLeft: 6,
-                background: "#3a3a3c",
-                padding: "1px 6px",
-                borderRadius: 4,
-              }}
-            >
-              coming soon
-            </span>
-          </span>
-          <input type="checkbox" disabled checked={settings.launch_at_login} />
+          <span>Launch at login</span>
+          <input
+            type="checkbox"
+            checked={launchAtLogin}
+            onChange={async (e) => {
+              const enabled = e.target.checked;
+              try {
+                await invoke("set_launch_at_login", { enabled });
+                setLaunchAtLogin(enabled);
+              } catch (err) {
+                console.error("Failed to set launch at login:", err);
+              }
+            }}
+          />
         </div>
       </div>
 

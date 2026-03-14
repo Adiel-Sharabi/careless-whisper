@@ -76,6 +76,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(AppState {
             settings: Mutex::new(settings),
             whisper_ctx: Mutex::new(None),
@@ -116,6 +120,8 @@ pub fn run() {
             download_model,
             delete_model,
             set_active_model,
+            get_launch_at_login,
+            set_launch_at_login,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

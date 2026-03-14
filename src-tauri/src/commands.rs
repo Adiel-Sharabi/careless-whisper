@@ -1,4 +1,5 @@
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_autostart::ManagerExt;
 
 use crate::config::settings::{OverlayPosition, Settings};
 use crate::models::downloader::{self, ModelInfo};
@@ -220,6 +221,34 @@ pub async fn set_active_model(
         settings.active_model = model;
         settings.save()?;
     }
+
+    Ok(())
+}
+
+// ── Autostart ────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn get_launch_at_login(app: AppHandle) -> Result<bool, String> {
+    let manager = app.autolaunch();
+    manager.is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn set_launch_at_login(
+    app: AppHandle,
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable().map_err(|e| e.to_string())?;
+    } else {
+        manager.disable().map_err(|e| e.to_string())?;
+    }
+
+    let mut settings = state.settings.lock().unwrap();
+    settings.launch_at_login = enabled;
+    settings.save()?;
 
     Ok(())
 }
