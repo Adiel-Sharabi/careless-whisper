@@ -14,8 +14,13 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     let menu = Menu::with_items(app, &[&settings, &separator, &quit])?;
 
+    let tray_icon =
+        tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
+            .unwrap_or_else(|_| app.default_window_icon().unwrap().clone());
+
     TrayIconBuilder::with_id("main")
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(tray_icon)
+        .icon_as_template(true)
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "settings" => {
