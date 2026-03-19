@@ -1,6 +1,7 @@
 <p align="center">
-  <img src="src-tauri/custom-icons/big-icon-cw.png" alt="Careless Whisper" width="200" />
+  <img width="512" height="512" alt="careless-whisper" src="https://github.com/user-attachments/assets/bde6e505-9564-4267-ae16-1880e9ca269f" />
 </p>
+
 
 # Careless Whisper
 
