@@ -79,8 +79,8 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(
             #[cfg(target_os = "macos")]
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            #[cfg(target_os = "windows")]
-            tauri_plugin_autostart::WindowsLauncher::StartupFolder,
+            #[cfg(not(target_os = "macos"))]
+            tauri_plugin_autostart::MacosLauncher::StartupFolder,
             None,
         ))
         .manage(AppState {

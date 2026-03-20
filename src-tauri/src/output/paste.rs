@@ -99,7 +99,7 @@ pub fn get_frontmost_target() -> Option<FocusTarget> {
     use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 
     let hwnd = unsafe { GetForegroundWindow() };
-    if hwnd.0 == 0 {
+    if hwnd.is_invalid() {
         None
     } else {
         Some(hwnd.0 as isize)
