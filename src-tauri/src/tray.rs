@@ -4,7 +4,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Manager, Runtime,
+    AppHandle, Manager, Runtime, WindowEvent,
 };
 
 pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
@@ -17,6 +17,18 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let tray_icon =
         tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
             .unwrap_or_else(|_| app.default_window_icon().unwrap().clone());
+
+    // Hide the settings window on close instead of destroying it,
+    // so it can be reopened from the tray menu.
+    if let Some(window) = app.get_webview_window("settings") {
+        let win = window.clone();
+        window.on_window_event(move |event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = win.hide();
+            }
+        });
+    }
 
     TrayIconBuilder::with_id("main")
         .icon(tray_icon)
