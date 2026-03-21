@@ -30,6 +30,24 @@ Supports **macOS** and **Windows**.
 
 > The app has no Dock icon — it lives in the **menu bar** (top-right of your screen).
 
+#### "Careless Whisper is damaged and can't be opened"
+
+Don't worry — the app is perfectly fine! macOS shows this warning for apps that aren't code-signed with Apple's $99/year Developer certificate. This is standard for open-source projects that are trying to be given away for free and avoid the Apple penalty for creative generosities. Until this project gets funded (don't hold your breath — it's a weekend side project), macOS users are welcome to run this one-time fix in Terminal:
+
+If you dragged the app to Applications:
+
+```sh
+xattr -cr "/Applications/Careless Whisper.app"
+```
+
+If you're running it straight from the DMG:
+
+```sh
+xattr -cr "/Volumes/Careless Whisper/Careless Whisper.app"
+```
+
+After that, the app will open normally.
+
 ### Windows
 
 1. Download the installer from the [Releases](https://github.com/yarivgilad/careless-whisper/releases) page.
