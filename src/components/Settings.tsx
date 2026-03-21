@@ -10,6 +10,7 @@ interface Settings {
   max_recording_seconds: number;
   launch_at_login: boolean;
   overlay_position: "top_center" | "bottom_center" | "top_left" | "top_right";
+  lower_volume_while_recording: boolean;
 }
 
 export function Settings() {
@@ -182,6 +183,16 @@ export function Settings() {
             checked={settings.auto_paste}
             onChange={(e) =>
               setSettings({ ...settings, auto_paste: e.target.checked })
+            }
+          />
+        </div>
+        <div className="settings-toggle">
+          <span>Lower volume while recording</span>
+          <input
+            type="checkbox"
+            checked={settings.lower_volume_while_recording}
+            onChange={(e) =>
+              setSettings({ ...settings, lower_volume_while_recording: e.target.checked })
             }
           />
         </div>

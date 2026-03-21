@@ -18,6 +18,7 @@ pub struct AppState {
     pub whisper_ctx: Mutex<Option<whisper_rs::WhisperContext>>,
     pub recording: Mutex<Option<audio::capture::RecordingHandle>>,
     pub target_focus: Mutex<Option<FocusTarget>>,
+    pub original_volume: Mutex<Option<f32>>,
 }
 
 /// macOS: Checks if the app has Accessibility permission.
@@ -85,6 +86,7 @@ pub fn run() {
             whisper_ctx: Mutex::new(None),
             recording: Mutex::new(None),
             target_focus: Mutex::new(None),
+            original_volume: Mutex::new(None),
         })
         .setup(|app| {
             #[cfg(target_os = "macos")]

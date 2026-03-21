@@ -27,6 +27,12 @@ pub struct Settings {
     pub max_recording_seconds: u32,
     pub launch_at_login: bool,
     pub overlay_position: OverlayPosition,
+    #[serde(default = "default_true")]
+    pub lower_volume_while_recording: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -40,6 +46,7 @@ impl Default for Settings {
             max_recording_seconds: 120,
             launch_at_login: false,
             overlay_position: OverlayPosition::TopCenter,
+            lower_volume_while_recording: true,
         }
     }
 }

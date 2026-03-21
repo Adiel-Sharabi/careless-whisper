@@ -54,6 +54,19 @@ pub async fn start_recording(
 ) -> Result<(), String> {
     let max_seconds = state.settings.lock().unwrap().max_recording_seconds;
     let overlay_pos = state.settings.lock().unwrap().overlay_position.clone();
+    let lower_volume = state.settings.lock().unwrap().lower_volume_while_recording;
+
+    if lower_volume {
+        match crate::audio::volume::get_system_volume() {
+            Ok(vol) => {
+                *state.original_volume.lock().unwrap() = Some(vol);
+                if let Err(e) = crate::audio::volume::set_system_volume(0.10) {
+                    eprintln!("[volume] failed to lower: {}", e);
+                }
+            }
+            Err(e) => eprintln!("[volume] failed to read: {}", e),
+        }
+    }
 
     let handle = crate::audio::capture::start_capture(max_seconds)?;
     *state.recording.lock().unwrap() = Some(handle);
@@ -85,6 +98,13 @@ pub async fn stop_recording(
         .ok_or("Not recording")?;
 
     let (raw_samples, sample_rate) = crate::audio::capture::stop_capture(handle);
+
+    // Restore volume immediately so the user hears audio again before transcription finishes
+    if let Some(vol) = state.original_volume.lock().unwrap().take() {
+        if let Err(e) = crate::audio::volume::set_system_volume(vol) {
+            eprintln!("[volume] failed to restore: {}", e);
+        }
+    }
 
     app.emit("recording-stopped", ()).map_err(|e| e.to_string())?;
 
