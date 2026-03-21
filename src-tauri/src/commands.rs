@@ -84,15 +84,15 @@ pub async fn stop_recording(
         .take()
         .ok_or("Not recording")?;
 
-    let (raw_samples, sample_rate) = crate::audio::capture::stop_capture(handle);
+    let (raw_samples, sample_rate, channels) = crate::audio::capture::stop_capture(handle);
 
     app.emit("recording-stopped", ()).map_err(|e| e.to_string())?;
 
-    let samples_16k = crate::audio::resample::resample_to_16k(raw_samples, sample_rate, 1);
+    let samples_16k = crate::audio::resample::resample_to_16k(raw_samples, sample_rate, channels as usize);
 
     let language = state.settings.lock().unwrap().language.clone();
     let auto_paste = state.settings.lock().unwrap().auto_paste;
-    let target_focus = *state.target_focus.lock().unwrap();
+    let target_focus = state.target_focus.lock().unwrap().clone();
     let active_model = state.settings.lock().unwrap().active_model.clone();
     let model_path = downloader::model_path(&active_model);
 
