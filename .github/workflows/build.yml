@@ -13,9 +13,11 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: '--target universal-apple-darwin'
+            tauri-args: '--target universal-apple-darwin'
+            cargo-args: ''
           - platform: windows-latest
-            args: '--no-default-features'
+            tauri-args: ''
+            cargo-args: '--no-default-features'
 
     runs-on: ${{ matrix.platform }}
 
@@ -49,7 +51,7 @@ jobs:
         run: pnpm install
 
       - name: Build
-        run: pnpm tauri build -- ${{ matrix.args }}
+        run: pnpm tauri build ${{ matrix.tauri-args }} -- ${{ matrix.cargo-args }}
 
       - name: Upload macOS artifacts
         if: matrix.platform == 'macos-latest'
