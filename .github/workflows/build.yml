@@ -84,6 +84,15 @@ jobs:
       - name: Build
         run: pnpm tauri build ${{ matrix.tauri-args }} -- ${{ matrix.cargo-args }}
 
+      - name: Re-sign macOS app with stable identifier
+        if: matrix.platform == 'macos-latest'
+        run: |
+          APP_PATH=$(find src-tauri/target -name "Careless Whisper.app" -type d | head -1)
+          echo "Re-signing $APP_PATH with stable identifier"
+          codesign --force --deep --sign - --identifier com.whispertap.careless-whisper "$APP_PATH"
+          echo "Verifying signature:"
+          codesign -dvv "$APP_PATH" 2>&1 | head -10
+
       - name: Upload macOS artifacts
         if: matrix.platform == 'macos-latest'
         uses: actions/upload-artifact@v5
