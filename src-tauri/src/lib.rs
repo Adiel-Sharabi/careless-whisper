@@ -94,19 +94,26 @@ fn setup_fifo_listener(app_handle: tauri::AppHandle) {
     // The token file is 0o600 so only the owner can read it.
     let token = generate_fifo_token();
     let token_path = data_dir.join("fifo.token");
-    match std::fs::write(&token_path, &token) {
-        Ok(_) => {
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(
-                    &token_path,
-                    std::fs::Permissions::from_mode(0o600),
-                );
+    // Write with mode 0o600 at creation time (no write-then-chmod race window).
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&token_path)
+        {
+            Ok(mut f) => {
+                if let Err(e) = f.write_all(token.as_bytes()) {
+                    log::warn!("Failed to write FIFO token: {}", e);
+                } else {
+                    log::info!("FIFO token written to {}", token_path.display());
+                }
             }
-            log::info!("FIFO token written to {}", token_path.display());
+            Err(e) => log::warn!("Failed to create FIFO token file: {}", e),
         }
-        Err(e) => log::warn!("Failed to write FIFO token: {}", e),
     }
 
     // Create a named pipe (FIFO) for receiving toggle commands.
@@ -185,7 +192,8 @@ fn generate_fifo_token() -> String {
             return bytes.iter().map(|b| format!("{:02x}", b)).collect();
         }
     }
-    // Fallback: time + PID (weaker but functional)
+    // Fallback: time + PID (weaker entropy — /dev/urandom unavailable)
+    log::warn!("FIFO token: /dev/urandom unavailable, falling back to low-entropy token");
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
