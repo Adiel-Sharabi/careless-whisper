@@ -298,6 +298,17 @@ export function Settings() {
       <button className="btn-primary" onClick={save} disabled={saving}>
         {saving ? "Saving…" : saved ? "Saved!" : "Save Settings"}
       </button>
+
+      <div className="help-section">
+        <p style={{ fontSize: 12, color: "#8e8e93", marginBottom: 8 }}>
+          Having trouble? Copy the app logs and share them in a GitHub issue.
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-secondary" onClick={reportIssue}>
+            {logsCopied ? "Logs copied! Paste in the issue" : "Copy Logs & Report Issue"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
