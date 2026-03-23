@@ -11,12 +11,13 @@ Supports **macOS** and **Windows**.
 
 ## Download
 
-| Platform | Link |
-|---|---|
-| macOS (Apple Silicon) | [Download .dmg](https://github.com/yarivgilad/careless-whisper/releases/latest/download/Careless.Whisper_0.1.0_aarch64.dmg) |
-| Windows | [Download .msi](https://github.com/YarivGilad/careless-whisper/releases/latest/download/Careless.Whisper_0.1.0_x64_en-US.msi) |
+Get the latest version from the [Releases](https://github.com/YarivGilad/careless-whisper/releases/latest) page:
 
-> All downloads are on the [Releases](https://github.com/yarivgilad/careless-whisper/releases) page.
+| Platform | File |
+|---|---|
+| macOS (Intel + Apple Silicon) | `.dmg` |
+| Windows | `.exe` installer or `.msi` |
+| Linux | `.deb` or `.AppImage` |
 
 ---
 
