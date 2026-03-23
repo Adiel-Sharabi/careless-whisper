@@ -317,12 +317,8 @@ pub fn run() {
                 // Check + prompt for accessibility only if not already granted
                 request_accessibility_if_needed();
 
-                // Check microphone permission; request if not yet determined
-                let mic_status = check_microphone_permission();
-                if mic_status == 0 {
-                    // Not determined — trigger the system prompt
-                    request_microphone_permission();
-                }
+                // Microphone permission is handled natively by cpal when recording starts.
+                // macOS will prompt the user for mic access on first recording attempt.
             }
 
             tray::setup_tray(&app.handle())?;
@@ -376,8 +372,6 @@ pub fn run() {
             set_active_model,
             check_accessibility,
             request_accessibility,
-            check_microphone,
-            request_microphone,
             get_launch_at_login,
             set_launch_at_login,
             get_recent_logs,

@@ -1,13 +1,14 @@
 {
   "name": "careless-whisper",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.4.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:ci": "tauri build --target universal-apple-darwin && codesign --force --deep --sign - --identifier com.whispertap.careless-whisper 'src-tauri/target/universal-apple-darwin/release/bundle/macos/Careless Whisper.app' && rm -f src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg && hdiutil create -volname 'Careless Whisper' -srcfolder 'src-tauri/target/universal-apple-darwin/release/bundle/macos/Careless Whisper.app' -ov -format UDZO 'src-tauri/target/universal-apple-darwin/release/bundle/dmg/Careless Whisper.dmg' && echo '✅ Build ready at src-tauri/target/universal-apple-darwin/release/bundle/dmg/Careless Whisper.dmg'"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

@@ -84,14 +84,17 @@ jobs:
       - name: Build
         run: pnpm tauri build ${{ matrix.tauri-args }} -- ${{ matrix.cargo-args }}
 
-      - name: Re-sign macOS app with stable identifier
+      - name: Re-sign macOS app and recreate DMG
         if: matrix.platform == 'macos-latest'
         run: |
-          APP_PATH=$(find src-tauri/target -name "Careless Whisper.app" -type d | head -1)
-          echo "Re-signing $APP_PATH with stable identifier"
+          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/Careless Whisper.app"
+          DMG_DIR="src-tauri/target/universal-apple-darwin/release/bundle/dmg"
+          echo "Re-signing with stable identifier..."
           codesign --force --deep --sign - --identifier com.whispertap.careless-whisper "$APP_PATH"
-          echo "Verifying signature:"
           codesign -dvv "$APP_PATH" 2>&1 | head -10
+          echo "Re-creating DMG with signed app..."
+          rm -f "$DMG_DIR"/*.dmg
+          hdiutil create -volname "Careless Whisper" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_DIR/Careless Whisper_$(cat src-tauri/tauri.conf.json | grep '"version"' | head -1 | sed 's/.*: "//;s/".*//')_universal.dmg"
 
       - name: Upload macOS artifacts
         if: matrix.platform == 'macos-latest'
