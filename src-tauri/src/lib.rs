@@ -96,7 +96,6 @@ fn setup_fifo_listener(app_handle: tauri::AppHandle) {
     let token_path = data_dir.join("fifo.token");
     // Write with mode 0o600 at creation time (no write-then-chmod race window).
     {
-        use std::io::Write;
         use std::os::unix::fs::OpenOptionsExt;
         match std::fs::OpenOptions::new()
             .write(true)
