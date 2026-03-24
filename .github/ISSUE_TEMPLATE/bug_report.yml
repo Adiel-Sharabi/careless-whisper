@@ -1,0 +1,92 @@
+name: 🐞 Bug Report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the details below so we can help you faster.
+
+  - type: input
+    id: version
+    attributes:
+      label: App Version
+      description: You can find this in the Settings window title bar or the DMG/installer filename.
+      placeholder: "e.g. 0.3.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows 10
+        - Windows 11
+        - Linux (X11)
+        - Linux (Wayland)
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: OS Version
+      placeholder: "e.g. macOS 15.7.4, Windows 11 23H2, Ubuntu 25.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe what you did and what went wrong.
+      placeholder: |
+        1. I pressed the hotkey to start recording
+        2. I spoke for a few seconds
+        3. I pressed the hotkey again to stop
+        4. Nothing was pasted
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+      placeholder: "The transcribed text should have been pasted into my text editor."
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Please paste your logs here. You can get them by:
+        - **Easiest:** Open Settings in the app → click **"Report Issue"** → logs are copied to your clipboard
+        - **Manual:** Find the log file at:
+          - macOS: `~/Library/Application Support/careless-whisper/careless-whisper.log`
+          - Windows: `%APPDATA%/careless-whisper/careless-whisper.log`
+          - Linux: `~/.local/share/careless-whisper/careless-whisper.log`
+      render: text
+
+  - type: checkboxes
+    id: permissions
+    attributes:
+      label: Permissions granted
+      description: "macOS users: both are required for the app to work fully."
+      options:
+        - label: Microphone access
+        - label: Accessibility access (macOS only)
+
+  - type: dropdown
+    id: model
+    attributes:
+      label: Which Whisper model are you using?
+      options:
+        - tiny
+        - base
+        - small
+        - medium
+        - large-v3
+        - Not sure / haven't downloaded one yet

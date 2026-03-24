@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "careless-whisper"
-version = "0.2.1"
+version = "0.4.3"
 dependencies = [
  "arboard",
  "cpal",

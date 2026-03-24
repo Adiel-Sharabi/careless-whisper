@@ -54,7 +54,7 @@ export function Settings() {
     );
   };
 
-  // Re-check accessibility when window regains focus (user may have toggled it in System Settings)
+  // Re-check permissions when window regains focus (user may have toggled them in System Settings)
   useEffect(() => {
     const onFocus = () => {
       invoke<boolean>("check_accessibility").then(setAccessibilityGranted).catch(() => {});
@@ -268,6 +268,17 @@ export function Settings() {
       <button className="btn-primary" onClick={save} disabled={saving}>
         {saving ? "Saving…" : saved ? "Saved!" : "Save Settings"}
       </button>
+
+      <div className="help-section">
+        <p style={{ fontSize: 12, color: "#8e8e93", marginBottom: 8 }}>
+          Having trouble? Copy the app logs and share them in a GitHub issue.
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-secondary" onClick={reportIssue}>
+            {logsCopied ? "Logs copied! Paste in the issue" : "Copy Logs & Report Issue"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
