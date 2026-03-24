@@ -214,13 +214,30 @@ pub async fn list_models() -> Result<Vec<ModelInfo>, String> {
     Ok(downloader::list_models())
 }
 
+/// The only valid model names. Rejects path traversal and URL injection attempts.
+const VALID_MODELS: &[&str] = &["tiny", "base", "small", "medium", "large-v3"];
+
+fn validate_model_name(model: &str) -> Result<(), String> {
+    if VALID_MODELS.contains(&model) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Unknown model '{}'. Valid models: {}",
+            model,
+            VALID_MODELS.join(", ")
+        ))
+    }
+}
+
 #[tauri::command]
 pub async fn download_model(app: AppHandle, model: String) -> Result<(), String> {
+    validate_model_name(&model)?;
     downloader::download_model(app, model).await
 }
 
 #[tauri::command]
 pub async fn delete_model(model: String) -> Result<(), String> {
+    validate_model_name(&model)?;
     downloader::delete_model(&model)
 }
 
@@ -229,6 +246,7 @@ pub async fn set_active_model(
     model: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    validate_model_name(&model)?;
     let model_path = downloader::model_path(&model);
     if !model_path.exists() {
         return Err(format!("Model '{}' is not downloaded", model));

@@ -181,7 +181,34 @@ fn setup_fifo_listener(app_handle: tauri::AppHandle) {
         let _ = writeln!(f, "{}", std::process::id());
     }
 
-    // Create a named pipe (FIFO) for receiving toggle commands
+    // Generate a random secret token for FIFO authentication.
+    // Any process wanting to trigger recording must include this token.
+    // The token file is 0o600 so only the owner can read it.
+    let token = generate_fifo_token();
+    let token_path = data_dir.join("fifo.token");
+    // Write with mode 0o600 at creation time (no write-then-chmod race window).
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&token_path)
+        {
+            Ok(mut f) => {
+                if let Err(e) = f.write_all(token.as_bytes()) {
+                    log::warn!("Failed to write FIFO token: {}", e);
+                } else {
+                    log::info!("FIFO token written to {}", token_path.display());
+                }
+            }
+            Err(e) => log::warn!("Failed to create FIFO token file: {}", e),
+        }
+    }
+
+    // Create a named pipe (FIFO) for receiving toggle commands.
+    // Mode 0o600: only the owner can read/write.
     let fifo_path = data_dir.join("careless-whisper.sock");
 
     // Remove stale FIFO
@@ -189,7 +216,7 @@ fn setup_fifo_listener(app_handle: tauri::AppHandle) {
 
     // Create the FIFO
     let fifo_c = std::ffi::CString::new(fifo_path.to_str().unwrap()).unwrap();
-    let ret = unsafe { libc::mkfifo(fifo_c.as_ptr(), 0o644) };
+    let ret = unsafe { libc::mkfifo(fifo_c.as_ptr(), 0o600) };
     if ret != 0 {
         log::error!(
             "Failed to create FIFO at {}: {}",
@@ -202,7 +229,7 @@ fn setup_fifo_listener(app_handle: tauri::AppHandle) {
     log::info!("FIFO listener at {}", fifo_path.display());
 
     // Spawn a thread that blocks on reading from the FIFO.
-    // Each time something is written (and the writer closes), we toggle.
+    // Each time a valid token is written (and the writer closes), we toggle.
     std::thread::spawn(move || {
         use std::io::Read;
 
@@ -217,11 +244,19 @@ fn setup_fifo_listener(app_handle: tauri::AppHandle) {
                 }
             };
 
-            // Read whatever was written (we don't care about content)
+            // Read and validate the token. Reject writes that don't include it.
             let mut buf = [0u8; 128];
-            let _ = file.read(&mut buf);
+            let n = file.read(&mut buf).unwrap_or(0);
+            let received = String::from_utf8_lossy(&buf[..n])
+                .trim()
+                .to_string();
 
-            log::info!("FIFO toggle received");
+            if received != token {
+                log::warn!("FIFO token mismatch — ignoring toggle request");
+                continue;
+            }
+
+            log::info!("FIFO toggle received (token verified)");
             let state = app_handle.state::<AppState>();
             let is_recording = state.recording.lock().unwrap().is_some();
 
@@ -235,6 +270,27 @@ fn setup_fifo_listener(app_handle: tauri::AppHandle) {
             }
         }
     });
+}
+
+/// Generates a cryptographically random 128-bit token from /dev/urandom.
+/// Encoded as hex. Falls back to time+PID if urandom is unavailable.
+#[cfg(target_os = "linux")]
+fn generate_fifo_token() -> String {
+    use std::io::Read;
+    let mut bytes = [0u8; 16];
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+        if f.read_exact(&mut bytes).is_ok() {
+            return bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        }
+    }
+    // Fallback: time + PID (weaker entropy — /dev/urandom unavailable)
+    log::warn!("FIFO token: /dev/urandom unavailable, falling back to low-entropy token");
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
+    format!("{:x}-{:x}", std::process::id(), nanos)
 }
 
 fn log_path() -> std::path::PathBuf {
