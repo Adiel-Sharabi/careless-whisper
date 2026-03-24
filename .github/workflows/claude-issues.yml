@@ -6,6 +6,11 @@ on:
   issue_comment:
     types: [created]
 
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
 jobs:
   triage:
     # Only run on new issues OR when @claude is mentioned in comments
