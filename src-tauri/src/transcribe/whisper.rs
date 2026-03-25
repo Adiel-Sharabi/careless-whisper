@@ -2,11 +2,27 @@ use std::path::Path;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 pub fn load_model(path: &Path) -> Result<WhisperContext, String> {
-    WhisperContext::new_with_params(
-        path.to_str().ok_or("Invalid model path")?,
-        WhisperContextParameters::default(),
-    )
-    .map_err(|e| format!("Failed to load model: {:?}", e))
+    let path_str = path.to_str().ok_or("Invalid model path")?;
+
+    let file_size = std::fs::metadata(path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    log::info!(
+        "[whisper] loading model from {} ({:.1} MB)",
+        path.display(),
+        file_size as f64 / 1_048_576.0
+    );
+
+    WhisperContext::new_with_params(path_str, WhisperContextParameters::default()).map_err(|e| {
+        format!(
+            "Failed to load model: {:?}. Path: {}, size: {} bytes. \
+             The file may be corrupted — try deleting and re-downloading it.",
+            e,
+            path.display(),
+            file_size
+        )
+    })
 }
 
 pub fn transcribe(ctx: &WhisperContext, samples: &[f32], language: &str) -> Result<String, String> {

@@ -121,6 +121,19 @@ pub async fn stop_recording(
     tokio::task::spawn_blocking(move || {
         let state = app_clone.state::<AppState>();
 
+        // Validate the model file before attempting to load it.
+        if let Err(e) = downloader::validate_model_file(&active_model) {
+            log::error!("[transcribe] model validation failed: {}", e);
+            let _ = app_clone.emit(
+                "transcription-error",
+                serde_json::json!({ "message": e }),
+            );
+            if let Some(win) = app_clone.get_webview_window("overlay") {
+                let _ = win.hide();
+            }
+            return;
+        }
+
         // Reuse cached model context, or load and cache it on first use.
         let ctx = state.whisper_ctx.lock().unwrap().take();
         let ctx = match ctx {

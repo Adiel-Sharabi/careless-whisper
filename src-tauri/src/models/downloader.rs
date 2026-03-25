@@ -114,6 +114,42 @@ pub async fn download_model(app: AppHandle, name: String) -> Result<(), String> 
     Ok(())
 }
 
+/// Pre-load validation: checks the model file exists, is non-empty, and matches its expected SHA256.
+pub fn validate_model_file(name: &str) -> Result<(), String> {
+    let path = model_path(name);
+
+    if !path.exists() {
+        return Err(format!("Model '{}' is not downloaded", name));
+    }
+
+    let metadata = std::fs::metadata(&path)
+        .map_err(|e| format!("Cannot read model '{}' at {}: {}", name, path.display(), e))?;
+
+    if metadata.len() == 0 {
+        return Err(format!(
+            "Model '{}' file is empty (0 bytes) at {}. Try deleting and re-downloading it.",
+            name,
+            path.display()
+        ));
+    }
+
+    if let Some(expected) = expected_sha256(name) {
+        let computed = sha256_file(&path)
+            .map_err(|e| format!("Failed to read model '{}' for verification: {}", name, e))?;
+        if computed != expected {
+            return Err(format!(
+                "Model '{}' is corrupted (SHA256 mismatch). File size: {} bytes at {}. \
+                 Please delete and re-download it from Settings → Model Manager.",
+                name,
+                metadata.len(),
+                path.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 pub fn delete_model(name: &str) -> Result<(), String> {
     let path = model_path(name);
     if path.exists() {

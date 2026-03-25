@@ -483,6 +483,7 @@ dependencies = [
  "rubato",
  "serde",
  "serde_json",
+ "sha2",
  "simplelog",
  "tauri",
  "tauri-build",
