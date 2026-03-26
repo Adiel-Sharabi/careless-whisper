@@ -14,12 +14,17 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     let menu = Menu::with_items(app, &[&settings, &separator, &quit])?;
 
-    let tray_icon =
-        tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
-            .unwrap_or_else(|_| app.default_window_icon().unwrap().clone());
+    let tray_icon = match tauri::image::Image::from_bytes(include_bytes!("../icons/tray-icon.png"))
+    {
+        Ok(icon) => icon,
+        Err(error) => {
+            log::warn!("[tray] failed to load bundled tray icon: {error}");
+            app.default_window_icon()
+                .cloned()
+                .ok_or_else(|| tauri::Error::AssetNotFound("No tray icon available".into()))?
+        }
+    };
 
-    // Hide the settings window on close instead of destroying it,
-    // so it can be reopened from the tray menu.
     if let Some(window) = app.get_webview_window("settings") {
         let win = window.clone();
         window.on_window_event(move |event| {

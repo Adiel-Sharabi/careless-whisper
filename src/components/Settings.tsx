@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
@@ -16,6 +17,13 @@ interface Settings {
   lower_volume_while_recording: boolean;
 }
 
+const AUDIO_FILE_FILTERS = [
+  {
+    name: "Audio",
+    extensions: ["mp3", "wav", "m4a", "mp4", "aac", "flac", "ogg", "oga"],
+  },
+];
+
 export function Settings() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -25,25 +33,32 @@ export function Settings() {
   const [lastError, setLastError] = useState<string | null>(null);
   const [logsCopied, setLogsCopied] = useState(false);
   const [appVersion, setAppVersion] = useState("");
+  const [selectedAudioPath, setSelectedAudioPath] = useState<string | null>(null);
+  const [transcribingFile, setTranscribingFile] = useState(false);
 
   useEffect(() => {
-    getVersion().then(setAppVersion).catch(() => {});
-    invoke<Settings>("get_settings").then(setSettings);
-    invoke<boolean>("get_launch_at_login").then(setLaunchAtLogin).catch(() => {});
-    invoke<boolean>("check_accessibility").then(setAccessibilityGranted).catch(() => {});
+    void getVersion().then(setAppVersion).catch(() => {});
+    void invoke<Settings>("get_settings").then(setSettings);
+    void invoke<boolean>("get_launch_at_login").then(setLaunchAtLogin).catch(() => {});
+    void invoke<boolean>("check_accessibility").then(setAccessibilityGranted).catch(() => {});
   }, []);
 
-  // Listen for backend errors
   useEffect(() => {
-    const unlisten = listen<{ message: string }>("backend-error", (e) => {
+    const unlistenError = listen<{ message: string }>("backend-error", (e) => {
       setLastError(e.payload.message);
     });
-    const unlisten2 = listen<{ message: string }>("transcription-error", (e) => {
+    const unlistenTranscriptionError = listen<{ message: string }>("transcription-error", (e) => {
       setLastError(e.payload.message);
+      setTranscribingFile(false);
     });
+    const unlistenComplete = listen<{ text: string }>("transcription-complete", () => {
+      setTranscribingFile(false);
+    });
+
     return () => {
-      unlisten.then((fn) => fn());
-      unlisten2.then((fn) => fn());
+      void unlistenError.then((fn) => fn());
+      void unlistenTranscriptionError.then((fn) => fn());
+      void unlistenComplete.then((fn) => fn());
     };
   }, []);
 
@@ -51,16 +66,15 @@ export function Settings() {
     const logs = await invoke<string>("get_recent_logs");
     await navigator.clipboard.writeText(logs);
     setLogsCopied(true);
-    setTimeout(() => setLogsCopied(false), 3000);
+    window.setTimeout(() => setLogsCopied(false), 3000);
     await openUrl(
       "https://github.com/YarivGilad/careless-whisper/issues/new?title=Bug+Report&body=%0A%0A---%0APaste+your+logs+here+(already+copied+to+clipboard)"
     );
   };
 
-  // Re-check permissions when window regains focus (user may have toggled them in System Settings)
   useEffect(() => {
     const onFocus = () => {
-      invoke<boolean>("check_accessibility").then(setAccessibilityGranted).catch(() => {});
+      void invoke<boolean>("check_accessibility").then(setAccessibilityGranted).catch(() => {});
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -72,9 +86,36 @@ export function Settings() {
     try {
       await invoke("update_settings", { settings });
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      window.setTimeout(() => setSaved(false), 2000);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const chooseAudioFile = async () => {
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      filters: AUDIO_FILE_FILTERS,
+    });
+
+    if (typeof selected === "string") {
+      setSelectedAudioPath(selected);
+    }
+  };
+
+  const transcribeSelectedFile = async () => {
+    if (!selectedAudioPath) {
+      return;
+    }
+
+    setLastError(null);
+    setTranscribingFile(true);
+    try {
+      await invoke("transcribe_audio_file", { path: selectedAudioPath });
+    } catch (error) {
+      setTranscribingFile(false);
+      setLastError(String(error));
     }
   };
 
@@ -103,10 +144,9 @@ export function Settings() {
           <button
             className="btn-secondary"
             onClick={() => {
-              invoke("request_accessibility").then(() => {
-                // Re-check after a short delay (user needs time to toggle)
-                setTimeout(() => {
-                  invoke<boolean>("check_accessibility").then(setAccessibilityGranted);
+              void invoke("request_accessibility").then(() => {
+                window.setTimeout(() => {
+                  void invoke<boolean>("check_accessibility").then(setAccessibilityGranted);
                 }, 1000);
               });
             }}
@@ -125,7 +165,7 @@ export function Settings() {
             {lastError}
           </p>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button className="btn-secondary" onClick={reportIssue}>
+            <button className="btn-secondary" onClick={() => void reportIssue()}>
               {logsCopied ? "Logs copied! Paste in the issue" : "Report Issue"}
             </button>
             <button
@@ -138,6 +178,25 @@ export function Settings() {
           </div>
         </div>
       )}
+
+      <div className="settings-section">
+        <label className="settings-label">Transcribe Audio File</label>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button className="btn-secondary" onClick={() => void chooseAudioFile()}>
+            Choose File
+          </button>
+          <button
+            className="btn-primary"
+            onClick={() => void transcribeSelectedFile()}
+            disabled={!selectedAudioPath || transcribingFile}
+          >
+            {transcribingFile ? "Transcribing…" : "Transcribe File"}
+          </button>
+        </div>
+        <p style={{ fontSize: 12, color: "#8e8e93", margin: "8px 0 0", wordBreak: "break-all" }}>
+          {selectedAudioPath ?? "Supports MP3, WAV, M4A, MP4, AAC, FLAC, and OGG."}
+        </p>
+      </div>
 
       <div className="settings-section">
         <label className="settings-label">Recording Hotkey</label>
@@ -228,7 +287,7 @@ export function Settings() {
           onChange={(e) =>
             setSettings({
               ...settings,
-              max_recording_seconds: parseInt(e.target.value) || 120,
+              max_recording_seconds: Number.parseInt(e.target.value, 10) || 120,
             })
           }
         />
@@ -260,20 +319,21 @@ export function Settings() {
           <input
             type="checkbox"
             checked={launchAtLogin}
-            onChange={async (e) => {
+            onChange={(e) => {
               const enabled = e.target.checked;
-              try {
-                await invoke("set_launch_at_login", { enabled });
-                setLaunchAtLogin(enabled);
-              } catch (err) {
-                console.error("Failed to set launch at login:", err);
-              }
+              void invoke("set_launch_at_login", { enabled })
+                .then(() => {
+                  setLaunchAtLogin(enabled);
+                })
+                .catch((error) => {
+                  setLastError(`Failed to set launch at login: ${String(error)}`);
+                });
             }}
           />
         </div>
       </div>
 
-      <button className="btn-primary" onClick={save} disabled={saving}>
+      <button className="btn-primary" onClick={() => void save()} disabled={saving}>
         {saving ? "Saving…" : saved ? "Saved!" : "Save Settings"}
       </button>
 
@@ -282,7 +342,7 @@ export function Settings() {
           Having trouble? Copy the app logs and share them in a GitHub issue.
         </p>
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn-secondary" onClick={reportIssue}>
+          <button className="btn-secondary" onClick={() => void reportIssue()}>
             {logsCopied ? "Logs copied! Paste in the issue" : "Copy Logs & Report Issue"}
           </button>
         </div>

@@ -6,13 +6,25 @@ import { Overlay } from "./components/Overlay";
 import { Toast } from "./components/Toast";
 import { useTauriEvents } from "./hooks/useTauriEvents";
 
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: {
+      metadata?: {
+        currentWindow?: {
+          label?: string;
+        };
+      };
+    };
+  }
+}
+
 function SettingsWindow() {
   const [activeModel, setActiveModel] = useState("base");
   const [toastMessage, setToastMessage] = useState("");
   const [toastVisible, setToastVisible] = useState(false);
 
   useEffect(() => {
-    invoke<{ active_model: string }>("get_settings").then((s) =>
+    void invoke<{ active_model: string }>("get_settings").then((s) =>
       setActiveModel(s.active_model)
     );
   }, []);
@@ -20,6 +32,12 @@ function SettingsWindow() {
   useTauriEvents((event) => {
     if (event.type === "backend-error" || event.type === "transcription-error") {
       setToastMessage(event.message);
+      setToastVisible(true);
+      return;
+    }
+
+    if (event.type === "transcription-complete") {
+      setToastMessage("Transcription copied to clipboard");
       setToastVisible(true);
     }
   });
@@ -42,9 +60,9 @@ function SettingsWindow() {
 function OverlayWindow() {
   useTauriEvents((event) => {
     if (event.type === "hotkey-start") {
-      invoke("start_recording").catch(console.error);
+      void invoke("start_recording").catch(console.error);
     } else if (event.type === "hotkey-stop") {
-      invoke("stop_recording").catch(console.error);
+      void invoke("stop_recording").catch(console.error);
     }
   });
 
@@ -52,8 +70,7 @@ function OverlayWindow() {
 }
 
 function App() {
-  const label = (window as any).__TAURI_INTERNALS__?.metadata?.currentWindow
-    ?.label as string | undefined;
+  const label = window.__TAURI_INTERNALS__?.metadata?.currentWindow?.label;
 
   if (label === "overlay") {
     return <OverlayWindow />;

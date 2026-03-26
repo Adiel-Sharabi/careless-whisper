@@ -14,29 +14,38 @@ export function ModelManager({ activeModel }: { activeModel: string }) {
   const [downloading, setDownloading] = useState<Record<string, number>>({});
   const [active, setActive] = useState(activeModel);
 
-  const refresh = () =>
-    invoke<ModelInfo[]>("list_models").then(setModels);
+  const refresh = async () => {
+    const nextModels = await invoke<ModelInfo[]>("list_models");
+    setModels(nextModels);
+  };
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, []);
 
+  useEffect(() => {
+    setActive(activeModel);
+  }, [activeModel]);
+
   useTauriEvents((event) => {
-    if (event.type === "download-progress") {
-      setDownloading((prev) => ({
-        ...prev,
-        [event.model]: event.percent,
-      }));
-      if (event.percent >= 100) {
-        setTimeout(() => {
-          setDownloading((prev) => {
-            const next = { ...prev };
-            delete next[event.model];
-            return next;
-          });
-          refresh();
-        }, 500);
-      }
+    if (event.type !== "download-progress") {
+      return;
+    }
+
+    setDownloading((prev) => ({
+      ...prev,
+      [event.model]: event.percent,
+    }));
+
+    if (event.percent >= 100) {
+      window.setTimeout(() => {
+        setDownloading((prev) => {
+          const next = { ...prev };
+          delete next[event.model];
+          return next;
+        });
+        void refresh();
+      }, 500);
     }
   });
 
@@ -44,21 +53,24 @@ export function ModelManager({ activeModel }: { activeModel: string }) {
     setDownloading((prev) => ({ ...prev, [name]: 0 }));
     try {
       await invoke("download_model", { model: name });
-    } catch (e) {
+      await refresh();
+    } catch (error) {
       setDownloading((prev) => {
         const next = { ...prev };
         delete next[name];
         return next;
       });
-      alert(`Download failed: ${e}`);
+      window.alert(`Download failed: ${String(error)}`);
     }
-    refresh();
   };
 
   const remove = async (name: string) => {
-    if (!confirm(`Delete model "${name}"?`)) return;
+    if (!window.confirm(`Delete model "${name}"?`)) {
+      return;
+    }
+
     await invoke("delete_model", { model: name });
-    refresh();
+    await refresh();
   };
 
   const activate = async (name: string) => {
@@ -104,7 +116,7 @@ export function ModelManager({ activeModel }: { activeModel: string }) {
               <div style={{ fontSize: 12, color: "#8e8e93", marginTop: 2 }}>
                 {m.disk_size_mb >= 1000
                   ? `${(m.disk_size_mb / 1024).toFixed(1)} GB`
-                  : `${m.disk_size_mb} MB`}{" "}
+                  : `${m.disk_size_mb} MB`} {" "}
                 · ~{m.ram_mb >= 1024 ? `${(m.ram_mb / 1024).toFixed(1)} GB` : `${m.ram_mb} MB`} RAM
               </div>
               {inProgress && (
@@ -119,7 +131,7 @@ export function ModelManager({ activeModel }: { activeModel: string }) {
 
             <div style={{ display: "flex", gap: 8 }}>
               {!m.is_downloaded && !inProgress && (
-                <button className="btn-secondary" onClick={() => download(m.name)}>
+                <button className="btn-secondary" onClick={() => void download(m.name)}>
                   Download
                 </button>
               )}
@@ -127,12 +139,12 @@ export function ModelManager({ activeModel }: { activeModel: string }) {
                 <span style={{ fontSize: 13, color: "#8e8e93" }}>{pct}%</span>
               )}
               {m.is_downloaded && active !== m.name && (
-                <button className="btn-secondary" onClick={() => activate(m.name)}>
+                <button className="btn-secondary" onClick={() => void activate(m.name)}>
                   Use
                 </button>
               )}
               {m.is_downloaded && (
-                <button className="btn-danger" onClick={() => remove(m.name)}>
+                <button className="btn-danger" onClick={() => void remove(m.name)}>
                   Delete
                 </button>
               )}

@@ -125,6 +125,12 @@ body {
   border-color: #0a84ff;
 }
 
+.settings-select option,
+.settings-select optgroup {
+  color: #111;
+  background: #fff;
+}
+
 .settings-toggle {
   display: flex;
   align-items: center;
