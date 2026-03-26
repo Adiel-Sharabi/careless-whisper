@@ -15,11 +15,36 @@ pub struct ModelInfo {
 /// (name, disk_mb, ram_mb, sha256)
 /// Hashes from https://huggingface.co/ggerganov/whisper.cpp — LFS pointer metadata
 const MODELS: &[(&str, u32, u32, &str)] = &[
-    ("tiny",     75,   390,  "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21"),
-    ("base",     142,  500,  "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"),
-    ("small",    466,  1024, "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b"),
-    ("medium",   1500, 2600, "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208"),
-    ("large-v3", 3000, 5120, "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2"),
+    (
+        "tiny",
+        75,
+        390,
+        "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21",
+    ),
+    (
+        "base",
+        142,
+        500,
+        "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe",
+    ),
+    (
+        "small",
+        466,
+        1024,
+        "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b",
+    ),
+    (
+        "medium",
+        1500,
+        2600,
+        "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208",
+    ),
+    (
+        "large-v3",
+        3000,
+        5120,
+        "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2",
+    ),
 ];
 
 pub fn models_dir() -> PathBuf {
@@ -46,7 +71,8 @@ pub fn list_models() -> Vec<ModelInfo> {
 }
 
 fn expected_sha256(name: &str) -> Option<&'static str> {
-    MODELS.iter()
+    MODELS
+        .iter()
         .find(|(n, _, _, _)| *n == name)
         .map(|(_, _, _, hash)| *hash)
 }

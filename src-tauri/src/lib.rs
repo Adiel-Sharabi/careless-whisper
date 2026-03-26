@@ -247,9 +247,7 @@ fn setup_fifo_listener(app_handle: tauri::AppHandle) {
             // Read and validate the token. Reject writes that don't include it.
             let mut buf = [0u8; 128];
             let n = file.read(&mut buf).unwrap_or(0);
-            let received = String::from_utf8_lossy(&buf[..n])
-                .trim()
-                .to_string();
+            let received = String::from_utf8_lossy(&buf[..n]).trim().to_string();
 
             if received != token {
                 log::warn!("FIFO token mismatch — ignoring toggle request");
@@ -316,14 +314,14 @@ fn init_logging() {
         }
     }
 
-    let file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path);
+    let file = fs::OpenOptions::new().create(true).append(true).open(&path);
 
-    let mut loggers: Vec<Box<dyn SharedLogger>> = vec![
-        TermLogger::new(LevelFilter::Debug, Config::default(), TerminalMode::Stderr, ColorChoice::Auto),
-    ];
+    let mut loggers: Vec<Box<dyn SharedLogger>> = vec![TermLogger::new(
+        LevelFilter::Debug,
+        Config::default(),
+        TerminalMode::Stderr,
+        ColorChoice::Auto,
+    )];
 
     if let Ok(f) = file {
         loggers.push(WriteLogger::new(LevelFilter::Info, Config::default(), f));
@@ -339,6 +337,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -384,9 +383,12 @@ pub fn run() {
             // The user can change the hotkey from the Settings window.
             if let Err(e) = hotkey::manager::register_hotkey(app) {
                 log::error!("Failed to register hotkey: {}. Change it in Settings.", e);
-                let _ = app.handle().emit("backend-error", serde_json::json!({
-                    "message": "Could not register hotkey. You can change it in Settings."
-                }));
+                let _ = app.handle().emit(
+                    "backend-error",
+                    serde_json::json!({
+                        "message": "Could not register hotkey. You can change it in Settings."
+                    }),
+                );
                 if let Some(win) = app.get_webview_window("settings") {
                     let _ = win.show();
                     let _ = win.set_focus();
@@ -420,6 +422,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             start_recording,
             stop_recording,
+            transcribe_audio_file,
             get_settings,
             update_settings,
             list_models,

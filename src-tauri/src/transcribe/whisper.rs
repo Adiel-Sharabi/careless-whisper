@@ -4,9 +4,7 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextPar
 pub fn load_model(path: &Path) -> Result<WhisperContext, String> {
     let path_str = path.to_str().ok_or("Invalid model path")?;
 
-    let file_size = std::fs::metadata(path)
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
     log::info!(
         "[whisper] loading model from {} ({:.1} MB)",
@@ -43,9 +41,7 @@ pub fn transcribe(ctx: &WhisperContext, samples: &[f32], language: &str) -> Resu
         .full(params, samples)
         .map_err(|e| format!("Transcription failed: {:?}", e))?;
 
-    let num_segments = state
-        .full_n_segments()
-        .map_err(|e| format!("{:?}", e))?;
+    let num_segments = state.full_n_segments().map_err(|e| format!("{:?}", e))?;
 
     let mut text = String::new();
     for i in 0..num_segments {

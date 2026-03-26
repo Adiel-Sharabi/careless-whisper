@@ -222,7 +222,10 @@ pub fn paste_into_target(target: FocusTarget) -> Result<(), String> {
 fn paste_x11(window_id: &str) -> Result<(), String> {
     // Validate window_id is a plain integer before passing to xdotool
     if !window_id.chars().all(|c| c.is_ascii_digit()) {
-        return Err(format!("Invalid window ID '{}': expected digits only", window_id));
+        return Err(format!(
+            "Invalid window ID '{}': expected digits only",
+            window_id
+        ));
     }
 
     // Re-focus the original window
