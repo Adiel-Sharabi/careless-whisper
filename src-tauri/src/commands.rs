@@ -83,6 +83,11 @@ fn spawn_transcription(
     model_path: PathBuf,
     hide_overlay_on_finish: bool,
 ) {
+    log::info!(
+        "[transcribe] starting: model='{}', language='{}', samples={}, auto_paste={}, target={:?}",
+        active_model, language, samples_16k.len(), auto_paste, target_focus
+    );
+
     tokio::task::spawn_blocking(move || {
         let state = app.state::<AppState>();
 
@@ -114,8 +119,9 @@ fn spawn_transcription(
         *state.whisper_ctx.lock().unwrap() = Some(ctx);
 
         match result {
-            Ok(text) => {
-                let _ = crate::output::clipboard::copy_to_clipboard(&text);
+            Ok(ref text) => {
+                log::info!("[transcribe] result ({} chars): {:?}", text.len(), &text[..text.len().min(100)]);
+                let _ = crate::output::clipboard::copy_to_clipboard(text);
 
                 if hide_overlay_on_finish {
                     hide_overlay(&app);
@@ -134,8 +140,9 @@ fn spawn_transcription(
                     }
                 }
             }
-            Err(error) => {
-                emit_transcription_error(&app, error);
+            Err(ref error) => {
+                log::error!("[transcribe] failed: {}", error);
+                emit_transcription_error(&app, error.clone());
                 if hide_overlay_on_finish {
                     hide_overlay(&app);
                 }
@@ -282,7 +289,7 @@ pub async fn list_models() -> Result<Vec<ModelInfo>, String> {
 
 const VALID_MODELS: &[&str] = &["tiny", "base", "small", "medium", "large-v3"];
 
-fn validate_model_name(model: &str) -> Result<(), String> {
+pub(crate) fn validate_model_name(model: &str) -> Result<(), String> {
     if VALID_MODELS.contains(&model) {
         Ok(())
     } else {
@@ -475,4 +482,33 @@ pub async fn get_recent_logs() -> Result<String, String> {
     let lines: Vec<&str> = content.lines().collect();
     let start = lines.len().saturating_sub(100);
     Ok(lines[start..].join("\n"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_model_all_valid() {
+        for name in &["tiny", "base", "small", "medium", "large-v3"] {
+            assert!(
+                validate_model_name(name).is_ok(),
+                "{} should be valid",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_model_path_traversal() {
+        assert!(validate_model_name("../../etc/passwd").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_injection() {
+        assert!(validate_model_name("tiny evil").is_err());
+        assert!(validate_model_name("tiny/evil").is_err());
+        assert!(validate_model_name("tiny\0evil").is_err());
+        assert!(validate_model_name("").is_err());
+    }
 }

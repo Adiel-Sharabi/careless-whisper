@@ -70,7 +70,7 @@ pub fn list_models() -> Vec<ModelInfo> {
         .collect()
 }
 
-fn expected_sha256(name: &str) -> Option<&'static str> {
+pub(crate) fn expected_sha256(name: &str) -> Option<&'static str> {
     MODELS
         .iter()
         .find(|(n, _, _, _)| *n == name)
@@ -184,7 +184,7 @@ pub fn delete_model(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
+pub(crate) fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
     use sha2::{Digest, Sha256};
     use std::io::Read;
 
@@ -199,4 +199,95 @@ fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
         hasher.update(&buf[..n]);
     }
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_path_construction() {
+        let path = model_path("base");
+        assert!(path.to_string_lossy().ends_with("ggml-base.bin"));
+    }
+
+    #[test]
+    fn test_validate_model_name_valid() {
+        // validate_model_name is in commands.rs, so test via the MODELS list
+        let valid = ["tiny", "base", "small", "medium", "large-v3"];
+        for name in &valid {
+            assert!(
+                MODELS.iter().any(|(n, _, _, _)| n == name),
+                "{} should be in MODELS",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_model_name_rejects_traversal() {
+        assert!(
+            !MODELS.iter().any(|(n, _, _, _)| *n == "../evil"),
+            "../evil should not be in MODELS"
+        );
+    }
+
+    #[test]
+    fn test_validate_model_name_rejects_empty() {
+        assert!(
+            !MODELS.iter().any(|(n, _, _, _)| n.is_empty()),
+            "empty string should not be in MODELS"
+        );
+    }
+
+    #[test]
+    fn test_validate_model_name_rejects_arbitrary() {
+        assert!(!MODELS.iter().any(|(n, _, _, _)| *n == "large-v2"));
+        assert!(!MODELS.iter().any(|(n, _, _, _)| *n == "TINY"));
+    }
+
+    #[test]
+    fn test_expected_sha256_known() {
+        let hash = expected_sha256("base");
+        assert!(hash.is_some());
+        assert_eq!(
+            hash.unwrap(),
+            "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"
+        );
+    }
+
+    #[test]
+    fn test_expected_sha256_unknown() {
+        assert!(expected_sha256("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_list_models_count() {
+        let models = list_models();
+        assert_eq!(models.len(), 5);
+    }
+
+    #[test]
+    fn test_sha256_file_correct() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test.bin");
+        let mut f = std::fs::File::create(&file_path).unwrap();
+        f.write_all(b"hello world").unwrap();
+        drop(f);
+
+        let hash = sha256_file(&file_path).unwrap();
+        // SHA256 of "hello world"
+        assert_eq!(
+            hash,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
+    }
+
+    #[test]
+    fn test_validate_model_file_missing() {
+        let result = validate_model_file("nonexistent_model_xyz");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not downloaded"));
+    }
 }

@@ -81,6 +81,9 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      - name: Run tests
+        run: cd src-tauri && cargo test
+
       - name: Build
         run: pnpm tauri build ${{ matrix.tauri-args }} -- ${{ matrix.cargo-args }}
 

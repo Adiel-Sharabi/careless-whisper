@@ -105,3 +105,121 @@ fn append_samples(output: &mut Vec<f32>, decoded: AudioBufferRef<'_>) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audio::resample::resample_to_16k;
+
+    fn generate_wav(path: &std::path::Path, sample_rate: u32, channels: u16, num_samples: usize) {
+        let spec = hound::WavSpec {
+            channels,
+            sample_rate,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(path, spec).unwrap();
+        for i in 0..num_samples * channels as usize {
+            let t = i as f32 / sample_rate as f32;
+            let sample = (t * 440.0 * 2.0 * std::f32::consts::PI).sin();
+            writer
+                .write_sample((sample * i16::MAX as f32) as i16)
+                .unwrap();
+        }
+        writer.finalize().unwrap();
+    }
+
+    #[test]
+    fn test_decode_wav_mono_16k() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mono_16k.wav");
+        generate_wav(&path, 16000, 1, 16000);
+
+        let (samples, sample_rate, channels) = decode_audio_file(&path).unwrap();
+        assert_eq!(sample_rate, 16000);
+        assert_eq!(channels, 1);
+        assert!(!samples.is_empty());
+    }
+
+    #[test]
+    fn test_decode_wav_stereo_44100() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("stereo_44100.wav");
+        generate_wav(&path, 44100, 2, 44100);
+
+        let (samples, sample_rate, channels) = decode_audio_file(&path).unwrap();
+        assert_eq!(sample_rate, 44100);
+        assert_eq!(channels, 2);
+        assert!(!samples.is_empty());
+    }
+
+    #[test]
+    fn test_decode_nonexistent_file() {
+        let result = decode_audio_file(Path::new("/tmp/nonexistent_audio_file_xyz.wav"));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("Failed to open") || err.contains("No such file"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_decode_not_audio() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("not_audio.wav");
+        std::fs::write(&path, b"not audio").unwrap();
+
+        let result = decode_audio_file(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decode_empty_wav() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.wav");
+        generate_wav(&path, 16000, 1, 0);
+
+        let result = decode_audio_file(&path);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().contains("did not contain any decodable audio"),
+            "expected empty audio error"
+        );
+    }
+
+    #[test]
+    fn test_decode_short_audio() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("short.wav");
+        // 100ms at 16kHz = 1600 samples
+        generate_wav(&path, 16000, 1, 1600);
+
+        let (samples, sample_rate, channels) = decode_audio_file(&path).unwrap();
+        assert_eq!(sample_rate, 16000);
+        assert_eq!(channels, 1);
+        assert!(!samples.is_empty());
+    }
+
+    #[test]
+    fn test_pipeline_stereo_to_mono_16k() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("stereo_44100_pipeline.wav");
+        let num_samples = 44100; // 1 second
+        generate_wav(&path, 44100, 2, num_samples);
+
+        let (samples, sample_rate, channels) = decode_audio_file(&path).unwrap();
+        assert_eq!(sample_rate, 44100);
+        assert_eq!(channels, 2);
+
+        let resampled = resample_to_16k(samples, sample_rate, channels as usize).unwrap();
+        // Should be approximately 1 second at 16kHz
+        let ratio = resampled.len() as f64 / 16000.0;
+        assert!(
+            ratio > 0.8 && ratio < 1.3,
+            "expected ~16000 samples, got {}",
+            resampled.len()
+        );
+    }
+}

@@ -333,7 +333,10 @@ fn init_logging() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_logging();
+    log::info!("=== Careless Whisper starting ===");
+    log::info!("[system] version={}, os={}, arch={}", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH);
     let settings = Settings::load();
+    log::info!("[settings] model='{}', language='{}', hotkey='{}', mode={:?}", settings.active_model, settings.language, settings.hotkey, settings.recording_mode);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

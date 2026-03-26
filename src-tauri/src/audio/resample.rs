@@ -47,3 +47,75 @@ pub fn resample_to_16k(
 
     Ok(output)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resample_zero_channels_errors() {
+        let samples = vec![0.0f32; 100];
+        let result = resample_to_16k(samples, 16000, 0);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("zero channels"));
+    }
+
+    #[test]
+    fn test_resample_mono_passthrough_at_16k() {
+        let samples = vec![0.1, 0.2, 0.3, 0.4, 0.5];
+        let result = resample_to_16k(samples.clone(), 16000, 1).unwrap();
+        assert_eq!(result, samples);
+    }
+
+    #[test]
+    fn test_resample_stereo_to_mono_averaging() {
+        // Stereo interleaved: [L, R, L, R] = [0.2, 0.8, 0.2, 0.8]
+        let samples = vec![0.2, 0.8, 0.2, 0.8];
+        let result = resample_to_16k(samples, 16000, 2).unwrap();
+        assert_eq!(result.len(), 2);
+        assert!((result[0] - 0.5).abs() < 1e-6);
+        assert!((result[1] - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_resample_44100_to_16000() {
+        let num_samples = 44100; // 1 second at 44.1kHz
+        let samples: Vec<f32> = (0..num_samples).map(|i| (i as f32 * 0.001).sin()).collect();
+        let result = resample_to_16k(samples, 44100, 1).unwrap();
+        let expected_len = 16000; // ~1 second at 16kHz
+        // Allow some tolerance due to resampler padding
+        let ratio = result.len() as f64 / expected_len as f64;
+        assert!(ratio > 0.9 && ratio < 1.2, "ratio was {}", ratio);
+    }
+
+    #[test]
+    fn test_resample_48000_to_16000() {
+        let num_samples = 48000; // 1 second at 48kHz
+        let samples: Vec<f32> = (0..num_samples).map(|i| (i as f32 * 0.001).sin()).collect();
+        let result = resample_to_16k(samples, 48000, 1).unwrap();
+        let expected_len = 16000;
+        let ratio = result.len() as f64 / expected_len as f64;
+        assert!(ratio > 0.9 && ratio < 1.2, "ratio was {}", ratio);
+    }
+
+    #[test]
+    fn test_resample_short_audio_under_chunk_size() {
+        // Less than 1024 samples
+        let samples: Vec<f32> = (0..500).map(|i| (i as f32 * 0.01).sin()).collect();
+        let result = resample_to_16k(samples, 44100, 1);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_resample_empty_at_16k() {
+        let result = resample_to_16k(vec![], 16000, 1).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_resample_empty_needs_resampling() {
+        // Empty input at a rate that requires resampling should not panic
+        let result = resample_to_16k(vec![], 44100, 1);
+        assert!(result.is_ok());
+    }
+}

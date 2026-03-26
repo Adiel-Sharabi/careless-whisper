@@ -20,9 +20,15 @@ pub fn start_capture(max_seconds: u32) -> Result<RecordingHandle, String> {
 
     let config = device.default_input_config().map_err(|e| e.to_string())?;
 
+    let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
     let sample_rate = config.sample_rate().0;
     let channels = config.channels();
     let max_samples = (sample_rate as usize) * (max_seconds as usize) * (channels as usize);
+
+    log::info!(
+        "[audio] device='{}', sample_rate={}, channels={}, max_seconds={}",
+        device_name, sample_rate, channels, max_seconds
+    );
 
     let samples: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
     let samples_clone = samples.clone();
@@ -55,6 +61,11 @@ pub fn stop_capture(handle: RecordingHandle) -> (Vec<f32>, u32, u16) {
     let sample_rate = handle.sample_rate;
     let channels = handle.channels;
     let samples = handle.samples.lock().unwrap().clone();
+    let duration_secs = samples.len() as f32 / (sample_rate as f32 * channels as f32);
+    log::info!(
+        "[audio] stopped: {} samples, {:.1}s, rate={}, channels={}",
+        samples.len(), duration_secs, sample_rate, channels
+    );
     // Dropping handle stops the stream.
     (samples, sample_rate, channels)
 }
