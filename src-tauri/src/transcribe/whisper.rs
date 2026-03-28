@@ -50,5 +50,9 @@ pub fn transcribe(ctx: &WhisperContext, samples: &[f32], language: &str) -> Resu
         }
     }
 
+    let text = text
+        .replace("[BLANK_AUDIO]", "")
+        .replace("[BLANK AUDIO]", "");
+
     Ok(text.trim().to_string())
 }
