@@ -150,8 +150,7 @@ fn spawn_transcription(
                 // Save the user's clipboard before overwriting it
                 let previous_clipboard = crate::output::clipboard::read_clipboard();
 
-                let formatted_text = format_text_output(text);
-                let _ = crate::output::clipboard::copy_to_clipboard(&formatted_text);
+                let _ = crate::output::clipboard::copy_to_clipboard(text);
 
                 if hide_overlay_on_finish {
                     hide_overlay(&app);
@@ -545,25 +544,6 @@ pub async fn get_recent_logs() -> Result<String, String> {
     let lines: Vec<&str> = content.lines().collect();
     let start = lines.len().saturating_sub(100);
     Ok(lines[start..].join("\n"))
-}
-
-/// Format transcription output: if multiple sentences are detected,
-/// convert to bullet points for better readability.
-fn format_text_output(text: &str) -> String {
-    let text = text.trim();
-    let parts: Vec<&str> = text
-        .split(". ")
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .collect();
-    if parts.len() <= 1 {
-        return text.to_string();
-    }
-    parts
-        .iter()
-        .map(|s| format!("\u{2022} {}", s))
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 #[cfg(test)]
