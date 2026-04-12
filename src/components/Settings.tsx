@@ -259,6 +259,11 @@ export function Settings() {
           <option value="pl">Polish</option>
           <option value="uk">Ukrainian</option>
         </select>
+        {settings.language === "auto" && (
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#f5a623", lineHeight: 1.4 }}>
+            Tip: Auto-detect may default to English for short recordings. For best results with non-English languages, select your language above.
+          </p>
+        )}
       </div>
 
       <div className="settings-section">

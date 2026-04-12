@@ -121,6 +121,10 @@ fn spawn_transcription(
         match result {
             Ok(ref text) => {
                 log::info!("[transcribe] result ({} chars): {:?}", text.len(), &text[..text.len().min(100)]);
+
+                // Save the user's clipboard before overwriting it
+                let previous_clipboard = crate::output::clipboard::read_clipboard();
+
                 let _ = crate::output::clipboard::copy_to_clipboard(text);
 
                 if hide_overlay_on_finish {
@@ -134,8 +138,18 @@ fn spawn_transcription(
 
                 if auto_paste {
                     if let Some(target) = target_focus {
-                        if let Err(error) = crate::output::paste::paste_into_target(target) {
-                            log::warn!("[paste error] {}", error);
+                        match crate::output::paste::paste_into_target(target) {
+                            Ok(()) => {
+                                // Paste succeeded — restore the user's original clipboard
+                                if let Some(prev) = previous_clipboard {
+                                    std::thread::sleep(std::time::Duration::from_millis(200));
+                                    let _ = crate::output::clipboard::copy_to_clipboard(&prev);
+                                }
+                            }
+                            Err(error) => {
+                                // Paste failed — keep transcription on clipboard so user can Cmd+V manually
+                                log::warn!("[paste error] {}", error);
+                            }
                         }
                     }
                 }
