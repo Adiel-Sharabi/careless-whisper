@@ -27,7 +27,9 @@ fn position_overlay(app: &AppHandle, win: &tauri::WebviewWindow, position: &Over
 
     let scale = monitor.scale_factor();
     let screen_w = monitor.size().width as f64 / scale;
+    let screen_h = monitor.size().height as f64 / scale;
     let win_width = 280.0;
+    let win_height = 80.0;
     let margin = 16.0;
 
     let x = match position {
@@ -36,13 +38,20 @@ fn position_overlay(app: &AppHandle, win: &tauri::WebviewWindow, position: &Over
         OverlayPosition::TopCenter | OverlayPosition::BottomCenter => (screen_w - win_width) / 2.0,
     };
 
+    let y = match position {
+        OverlayPosition::BottomCenter => screen_h - win_height - margin,
+        _ => 40.0,
+    };
+
     log::warn!(
-        "[overlay] x={}, screen_w={}, position={:?}",
+        "[overlay] x={}, y={}, screen_w={}, screen_h={}, position={:?}",
         x,
+        y,
         screen_w,
+        screen_h,
         position
     );
-    let _ = win.set_position(LogicalPosition::new(x, 40.0));
+    let _ = win.set_position(LogicalPosition::new(x, y));
 }
 
 fn hide_overlay(app: &AppHandle) {
