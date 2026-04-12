@@ -12,7 +12,7 @@ const MAX_HEIGHT = 16;
 export function Overlay() {
   const [state, setState] = useState<OverlayState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [barHeights, setBarHeights] = useState<number[]>(BAR_WEIGHTS.map(() => MIN_HEIGHT));
+  const [barHeights, setBarHeights] = useState<number[] | null>(null);
   const smoothedLevel = useRef(0);
 
   useTauriEvents((event) => {
@@ -20,7 +20,7 @@ export function Overlay() {
       setState("recording");
     } else if (event.type === "recording-stopped") {
       setState("transcribing");
-      setBarHeights(BAR_WEIGHTS.map(() => MIN_HEIGHT));
+      setBarHeights(null);
     } else if (event.type === "transcription-complete") {
       setState("idle");
     } else if (event.type === "transcription-error") {
@@ -30,7 +30,6 @@ export function Overlay() {
     }
   });
 
-  // Listen for real-time audio level events from the Rust backend
   useEffect(() => {
     let cancelled = false;
     let unlisten: (() => void) | null = null;
@@ -38,12 +37,10 @@ export function Overlay() {
     listen<{ level: number }>("audio-level", (e) => {
       if (cancelled) return;
       const raw = e.payload.level;
-      // Smooth the level to avoid jittery bars
       smoothedLevel.current += (raw - smoothedLevel.current) * 0.4;
       const level = smoothedLevel.current;
 
       const heights = BAR_WEIGHTS.map((weight) => {
-        // Add slight random jitter for organic feel
         const jitter = 1 + (Math.random() - 0.5) * 0.3;
         const h = MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * weight * level * jitter;
         return Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, h));
@@ -71,11 +68,11 @@ export function Overlay() {
         <div className="overlay-pill overlay-recording">
           <span className="recording-dot" />
           <div className="waveform">
-            {barHeights.map((h, i) => (
+            {BAR_WEIGHTS.map((_, i) => (
               <span
                 key={i}
                 className="waveform-bar"
-                style={{ height: `${h}px` }}
+                style={barHeights ? { height: `${barHeights[i]}px` } : {}}
               />
             ))}
           </div>
