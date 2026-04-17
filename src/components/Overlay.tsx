@@ -103,7 +103,7 @@ export function Overlay() {
       {state === "transcribing" && (
         <div className="overlay-pill overlay-transcribing">
           <span className="spinner" />
-          <span className="overlay-text">Transcribing…</span>
+          <span className="overlay-status">Transcribing…</span>
         </div>
       )}
       {state === "error" && (

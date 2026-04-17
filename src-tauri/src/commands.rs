@@ -11,12 +11,76 @@ use crate::output::paste::FocusTarget;
 use crate::AppState;
 
 fn position_overlay(app: &AppHandle, win: &tauri::WebviewWindow, position: &OverlayPosition) {
-    use tauri::LogicalPosition;
+    use tauri::PhysicalPosition;
 
-    let monitor = win
-        .current_monitor()
-        .ok()
-        .flatten()
+    // Find the monitor the user is actually working on (cursor's monitor).
+    // Notes on Tauri 2.x + macOS coordinate quirks:
+    //   - `monitor_from_point` is unreliable on macOS — we hit-test manually.
+    //   - `monitor.position()` is in primary-scale logical points, but
+    //     `monitor.size()` is in physical pixels. Dividing by scale gives
+    //     logical size, which lines up with the cursor coordinate space.
+    //   - Cursor Y values don't always line up cleanly across displays with
+    //     different heights, so we do an X-only hit test — this reliably
+    //     picks the right monitor for the vast majority of arrangements
+    //     (side-by-side) and falls back gracefully otherwise.
+    let cursor_pos = app.cursor_position().ok();
+    let monitors = app.available_monitors().unwrap_or_default();
+    for (i, m) in monitors.iter().enumerate() {
+        log::info!(
+            "[overlay] monitor[{}] origin={:?} size={:?} scale={}",
+            i,
+            m.position(),
+            m.size(),
+            m.scale_factor()
+        );
+    }
+
+    // Primary monitor's scale factor is the reference for the whole "logical"
+    // coordinate space — monitor positions are in primary-logical points, but
+    // cursor_position() returns true physical pixels on the virtual desktop.
+    // We need to convert origins to physical to hit-test correctly.
+    let primary_scale = monitors
+        .iter()
+        .find(|m| m.position().x == 0 && m.position().y == 0)
+        .map(|m| m.scale_factor())
+        .or_else(|| app.primary_monitor().ok().flatten().map(|m| m.scale_factor()))
+        .unwrap_or(1.0);
+
+    // X-only hit test with a nearest-monitor fallback. Cursor coords can drift
+    // a few dozen pixels outside the reported monitor bounds (bezel, rounding,
+    // coordinate-system mismatches), so pick the monitor whose X range is
+    // closest to the cursor if no monitor contains it exactly.
+    let cursor_monitor = cursor_pos.as_ref().and_then(|pos| {
+        let x_distance = |m: &tauri::Monitor| -> f64 {
+            let left = m.position().x as f64 * primary_scale;
+            let right = left + m.size().width as f64;
+            if pos.x < left {
+                left - pos.x
+            } else if pos.x >= right {
+                pos.x - right + 1.0
+            } else {
+                0.0
+            }
+        };
+        monitors
+            .iter()
+            .min_by(|a, b| {
+                x_distance(a)
+                    .partial_cmp(&x_distance(b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .cloned()
+    });
+
+    log::info!(
+        "[overlay] cursor={:?}, primary_scale={}, hit_monitor_origin={:?}",
+        cursor_pos,
+        primary_scale,
+        cursor_monitor.as_ref().map(|m| m.position())
+    );
+
+    let monitor = cursor_monitor
+        .or_else(|| win.current_monitor().ok().flatten())
         .or_else(|| app.primary_monitor().ok().flatten());
 
     let monitor = match monitor {
@@ -27,33 +91,54 @@ fn position_overlay(app: &AppHandle, win: &tauri::WebviewWindow, position: &Over
         }
     };
 
-    let scale = monitor.scale_factor();
-    let screen_w = monitor.size().width as f64 / scale;
-    let screen_h = monitor.size().height as f64 / scale;
-    let win_width = 260.0;
-    let win_height = 44.0;
+    // Work in macOS NSScreen points (same units as monitor.position()), then
+    // multiply by primary_scale at the end — Tauri's PhysicalPosition is
+    // effectively `NSScreen-points × primary_scale` on macOS, so that's what
+    // we feed it.
+    let target_scale = monitor.scale_factor();
+    let origin_x_points = monitor.position().x as f64;
+    let origin_y_points = monitor.position().y as f64;
+    // NSScreen width is reported_physical_size / target_scale (size field is
+    // in physical pixels, but NSScreen frames live in points).
+    let screen_w_points = monitor.size().width as f64 / target_scale;
+    let screen_h_points = monitor.size().height as f64 / target_scale;
+
+    let overlay_w = 320.0;
+    let overlay_h = 80.0;
     let margin = 16.0;
+    let top_offset = 40.0;
 
-    let x = match position {
+    let offset_x = match position {
         OverlayPosition::TopLeft => margin,
-        OverlayPosition::TopRight => screen_w - win_width - margin,
-        OverlayPosition::TopCenter | OverlayPosition::BottomCenter => (screen_w - win_width) / 2.0,
+        OverlayPosition::TopRight => screen_w_points - overlay_w - margin,
+        OverlayPosition::TopCenter | OverlayPosition::BottomCenter => {
+            (screen_w_points - overlay_w) / 2.0
+        }
+    };
+    let offset_y = match position {
+        OverlayPosition::BottomCenter => screen_h_points - overlay_h - margin,
+        _ => top_offset,
     };
 
-    let y = match position {
-        OverlayPosition::BottomCenter => screen_h - win_height - margin,
-        _ => 40.0,
-    };
+    let x_points = origin_x_points + offset_x;
+    let y_points = origin_y_points + offset_y;
+    let x_phys = x_points * primary_scale;
+    let y_phys = y_points * primary_scale;
 
-    log::warn!(
-        "[overlay] x={}, y={}, screen_w={}, screen_h={}, position={:?}",
-        x,
-        y,
-        screen_w,
-        screen_h,
+    log::info!(
+        "[overlay] target_origin_pts=({}, {}), {}x{} pts @ {}x, overlay_pts=({}, {}), phys=({}, {}), position={:?}",
+        origin_x_points,
+        origin_y_points,
+        screen_w_points,
+        screen_h_points,
+        target_scale,
+        x_points,
+        y_points,
+        x_phys,
+        y_phys,
         position
     );
-    let _ = win.set_position(LogicalPosition::new(x, y));
+    let _ = win.set_position(PhysicalPosition::new(x_phys, y_phys));
 }
 
 /// On macOS, elevate the overlay window above the dock (level 20).
