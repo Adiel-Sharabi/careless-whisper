@@ -9,6 +9,8 @@ A lightweight, always-on desktop app for local voice-to-text transcription. Live
 
 Supports **macOS** and **Windows**.
 
+**Website:** [yarivgilad.github.io/careless-whisper](https://yarivgilad.github.io/careless-whisper/)
+
 ## Download
 
 Get the latest version from the [Releases](https://github.com/YarivGilad/careless-whisper/releases/latest) page:
