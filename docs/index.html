@@ -144,6 +144,30 @@
       .terminal-dot {
         width: 11px; height: 11px; border-radius: 50%;
       }
+
+      /* macOS heads-up dialog */
+      dialog#mac-heads-up {
+        background: #13131a;
+        color: #e8e8ee;
+        border: 1px solid #23232e;
+        border-radius: 16px;
+        padding: 0;
+        max-width: 560px;
+        width: calc(100% - 32px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6),
+                    0 0 0 1px rgba(236, 72, 153, 0.18);
+      }
+      dialog#mac-heads-up::backdrop {
+        background: rgba(5, 5, 10, 0.7);
+        backdrop-filter: blur(6px);
+      }
+      dialog#mac-heads-up[open] {
+        animation: dialog-in 0.22s ease-out;
+      }
+      @keyframes dialog-in {
+        from { opacity: 0; transform: translateY(8px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
     </style>
   </head>
 
@@ -228,7 +252,7 @@
         </div>
 
         <p class="mt-6 text-sm text-muted">
-          Free and open source. <span id="version-badge" class="font-mono text-text/80">v0.5.4</span> · <a href="https://github.com/YarivGilad/careless-whisper/releases" class="underline underline-offset-2 hover:text-text">All releases</a>
+          Free and open source. <span id="version-badge" class="font-mono text-text/80">Latest</span> · <a href="https://github.com/YarivGilad/careless-whisper/releases" class="underline underline-offset-2 hover:text-text">All releases</a>
         </p>
 
         <!-- Hero overlay mock -->
@@ -438,6 +462,63 @@
       </div>
     </footer>
 
+    <!-- macOS heads-up dialog -->
+    <dialog id="mac-heads-up" aria-labelledby="mac-heads-up-title">
+      <div class="p-7">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center flex-shrink-0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            </div>
+            <h2 id="mac-heads-up-title" class="text-xl font-bold tracking-tight">Quick heads-up for macOS</h2>
+          </div>
+          <button type="button" id="mac-heads-up-close"
+            class="text-muted hover:text-text transition-colors p-1 -m-1" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="mt-5 text-sm text-muted leading-relaxed space-y-3">
+          <p>The first time you open Careless Whisper, macOS will say the app is <span class="text-text font-medium">"damaged and can't be opened."</span> It's not — the app is perfectly fine.</p>
+          <p>macOS only trusts apps signed with Apple's paid Developer certificate ($99/year). This is a free open-source side project, so it's unsigned. One terminal command clears the warning permanently:</p>
+        </div>
+
+        <div class="terminal mt-5 text-sm">
+          <div class="terminal-bar">
+            <span class="terminal-dot" style="background:#ff5f56"></span>
+            <span class="terminal-dot" style="background:#ffbd2e"></span>
+            <span class="terminal-dot" style="background:#27c93f"></span>
+            <span class="ml-auto text-muted text-xs">Terminal</span>
+          </div>
+          <pre id="mac-fix-cmd" class="px-5 py-4 text-text/90 leading-relaxed overflow-x-auto"><span class="text-muted">$</span> xattr -cr "/Applications/Careless Whisper.app"</pre>
+        </div>
+
+        <button type="button" id="mac-fix-copy"
+          class="mt-3 w-full px-4 py-2.5 rounded-lg border border-border hover:border-muted transition-colors text-sm font-medium flex items-center justify-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          <span id="mac-fix-copy-label">Copy command</span>
+        </button>
+
+        <p class="mt-5 text-xs text-muted leading-relaxed">
+          Run the command after dragging the app to Applications. For full install details see the
+          <a href="https://github.com/YarivGilad/careless-whisper#macos" target="_blank" rel="noopener"
+             class="text-accent hover:underline">README on GitHub</a>.
+        </p>
+
+        <div class="mt-6 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+          <button type="button" id="mac-heads-up-cancel"
+            class="px-5 py-2.5 rounded-lg border border-border hover:border-muted transition-colors text-sm font-medium">
+            Cancel
+          </button>
+          <a href="#" id="mac-heads-up-proceed"
+            class="px-5 py-2.5 rounded-lg bg-accent hover:bg-accent/90 text-white text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2">
+            Got it — download now
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          </a>
+        </div>
+      </div>
+    </dialog>
+
     <script>
       const REPO = "YarivGilad/careless-whisper";
 
@@ -458,7 +539,55 @@
           const winBtn = document.getElementById("dl-win");
           if (dmg && macBtn) macBtn.href = dmg.browser_download_url;
           if (msi && winBtn) winBtn.href = msi.browser_download_url;
+
+          const proceedBtn = document.getElementById("mac-heads-up-proceed");
+          if (dmg && proceedBtn) proceedBtn.href = dmg.browser_download_url;
         } catch {}
+      })();
+
+      // macOS heads-up modal — intercept Mac download, warn non-technical users
+      // about the "damaged" Gatekeeper warning and offer a one-click fix.
+      (() => {
+        const dialog = document.getElementById("mac-heads-up");
+        const macBtn = document.getElementById("dl-mac");
+        const closeBtn = document.getElementById("mac-heads-up-close");
+        const cancelBtn = document.getElementById("mac-heads-up-cancel");
+        const proceedBtn = document.getElementById("mac-heads-up-proceed");
+        const copyBtn = document.getElementById("mac-fix-copy");
+        const copyLabel = document.getElementById("mac-fix-copy-label");
+        const cmdEl = document.getElementById("mac-fix-cmd");
+        if (!dialog || !macBtn) return;
+
+        macBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          dialog.showModal();
+        });
+
+        const close = () => dialog.close();
+        closeBtn?.addEventListener("click", close);
+        cancelBtn?.addEventListener("click", close);
+        proceedBtn?.addEventListener("click", () => dialog.close());
+        dialog.addEventListener("click", (e) => {
+          if (e.target === dialog) dialog.close();
+        });
+
+        copyBtn?.addEventListener("click", async () => {
+          const cmd = 'xattr -cr "/Applications/Careless Whisper.app"';
+          try {
+            await navigator.clipboard.writeText(cmd);
+            if (copyLabel) copyLabel.textContent = "Copied!";
+            setTimeout(() => {
+              if (copyLabel) copyLabel.textContent = "Copy command";
+            }, 2000);
+          } catch {
+            // Fallback: select the command text so the user can copy manually
+            const range = document.createRange();
+            range.selectNodeContents(cmdEl);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        });
       })();
 
       // Load contributors
