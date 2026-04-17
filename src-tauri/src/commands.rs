@@ -30,7 +30,7 @@ fn position_overlay(app: &AppHandle, win: &tauri::WebviewWindow, position: &Over
     let scale = monitor.scale_factor();
     let screen_w = monitor.size().width as f64 / scale;
     let screen_h = monitor.size().height as f64 / scale;
-    let win_width = 200.0;
+    let win_width = 260.0;
     let win_height = 44.0;
     let margin = 16.0;
 

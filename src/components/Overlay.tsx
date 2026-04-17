@@ -13,11 +13,14 @@ export function Overlay() {
   const [state, setState] = useState<OverlayState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [barHeights, setBarHeights] = useState<number[] | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const smoothedLevel = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useTauriEvents((event) => {
     if (event.type === "recording-started") {
       setState("recording");
+      setElapsed(0);
     } else if (event.type === "recording-stopped") {
       setState("transcribing");
       setBarHeights(null);
@@ -29,6 +32,24 @@ export function Overlay() {
       setTimeout(() => setState("idle"), 3000);
     }
   });
+
+  useEffect(() => {
+    if (state === "recording") {
+      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [state]);
+
+  const formatTime = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +97,7 @@ export function Overlay() {
               />
             ))}
           </div>
+          <span className="overlay-timer">{formatTime(elapsed)}</span>
         </div>
       )}
       {state === "transcribing" && (
