@@ -1,21 +1,26 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { useTauriEvents } from "../hooks/useTauriEvents";
 
 type OverlayState = "idle" | "recording" | "transcribing" | "error";
 
+// Each bar has a base weight that shapes the waveform pattern (taller in center)
+const BAR_WEIGHTS = [0.35, 0.65, 1.0, 0.65, 0.35];
+const MIN_HEIGHT = 3;
+const MAX_HEIGHT = 16;
+
 export function Overlay() {
   const [state, setState] = useState<OverlayState>("idle");
-  const [elapsed, setElapsed] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [barHeights, setBarHeights] = useState<number[] | null>(null);
+  const smoothedLevel = useRef(0);
 
   useTauriEvents((event) => {
     if (event.type === "recording-started") {
       setState("recording");
-      setElapsed(0);
     } else if (event.type === "recording-stopped") {
       setState("transcribing");
-      if (timerRef.current) clearInterval(timerRef.current);
+      setBarHeights(null);
     } else if (event.type === "transcription-complete") {
       setState("idle");
     } else if (event.type === "transcription-error") {
@@ -26,33 +31,56 @@ export function Overlay() {
   });
 
   useEffect(() => {
-    if (state === "recording") {
-      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [state]);
+    let cancelled = false;
+    let unlisten: (() => void) | null = null;
 
-  const formatTime = (s: number) =>
-    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    listen<{ level: number }>("audio-level", (e) => {
+      if (cancelled) return;
+      const raw = e.payload.level;
+      smoothedLevel.current += (raw - smoothedLevel.current) * 0.4;
+      const level = smoothedLevel.current;
+
+      const heights = BAR_WEIGHTS.map((weight) => {
+        const jitter = 1 + (Math.random() - 0.5) * 0.3;
+        const h = MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * weight * level * jitter;
+        return Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, h));
+      });
+      setBarHeights(heights);
+    }).then((fn) => {
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
 
   if (state === "idle") return null;
 
   return (
     <div className="overlay-root">
       {state === "recording" && (
-        <div className="overlay-pill">
+        <div className="overlay-pill overlay-recording">
           <span className="recording-dot" />
-          <span className="overlay-text">{formatTime(elapsed)}</span>
+          <div className="waveform">
+            {BAR_WEIGHTS.map((_, i) => (
+              <span
+                key={i}
+                className="waveform-bar"
+                style={barHeights ? { height: `${barHeights[i]}px` } : {}}
+              />
+            ))}
+          </div>
         </div>
       )}
       {state === "transcribing" && (
-        <div className="overlay-pill">
+        <div className="overlay-pill overlay-transcribing">
           <span className="spinner" />
-          <span className="overlay-text">Transcribing…</span>
         </div>
       )}
       {state === "error" && (

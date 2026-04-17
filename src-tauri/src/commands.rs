@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
@@ -27,7 +29,9 @@ fn position_overlay(app: &AppHandle, win: &tauri::WebviewWindow, position: &Over
 
     let scale = monitor.scale_factor();
     let screen_w = monitor.size().width as f64 / scale;
-    let win_width = 280.0;
+    let screen_h = monitor.size().height as f64 / scale;
+    let win_width = 200.0;
+    let win_height = 44.0;
     let margin = 16.0;
 
     let x = match position {
@@ -36,13 +40,34 @@ fn position_overlay(app: &AppHandle, win: &tauri::WebviewWindow, position: &Over
         OverlayPosition::TopCenter | OverlayPosition::BottomCenter => (screen_w - win_width) / 2.0,
     };
 
+    let y = match position {
+        OverlayPosition::BottomCenter => screen_h - win_height - margin,
+        _ => 40.0,
+    };
+
     log::warn!(
-        "[overlay] x={}, screen_w={}, position={:?}",
+        "[overlay] x={}, y={}, screen_w={}, screen_h={}, position={:?}",
         x,
+        y,
         screen_w,
+        screen_h,
         position
     );
-    let _ = win.set_position(LogicalPosition::new(x, 40.0));
+    let _ = win.set_position(LogicalPosition::new(x, y));
+}
+
+/// On macOS, elevate the overlay window above the dock (level 20).
+/// NSStatusWindowLevel (25) ensures it floats above the dock and menu bar.
+#[cfg(target_os = "macos")]
+fn set_overlay_above_dock(win: &tauri::WebviewWindow) {
+    use objc2::msg_send;
+    unsafe {
+        if let Ok(ns_win) = win.ns_window() {
+            let ns_win = ns_win as *mut objc2::runtime::AnyObject;
+            // kCGStatusWindowLevel = 25, above kCGDockWindowLevel (20)
+            let _: () = msg_send![ns_win, setLevel: 25_i64];
+        }
+    }
 }
 
 fn hide_overlay(app: &AppHandle) {
@@ -182,6 +207,7 @@ pub async fn start_recording(app: AppHandle, state: State<'_, AppState>) -> Resu
     }
 
     let handle = crate::audio::capture::start_capture(settings.max_recording_seconds)?;
+    let current_level = handle.current_level.clone();
     *state.recording.lock().unwrap() = Some(handle);
 
     if let Some(win) = app.get_webview_window("overlay") {
@@ -191,8 +217,25 @@ pub async fn start_recording(app: AppHandle, state: State<'_, AppState>) -> Resu
         let overlay_pos = settings.overlay_position.clone();
         let _ = app.run_on_main_thread(move || {
             position_overlay(&app_clone, &win_clone, &overlay_pos);
+            #[cfg(target_os = "macos")]
+            set_overlay_above_dock(&win_clone);
         });
     }
+
+    // Spawn a task that emits audio level events at ~20fps for waveform visualization
+    let level_active = Arc::new(AtomicBool::new(true));
+    *state.level_emitter_active.lock().unwrap() = Some(level_active.clone());
+    let app_for_level = app.clone();
+    tokio::spawn(async move {
+        while level_active.load(Ordering::Relaxed) {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            let bits = current_level.load(Ordering::Relaxed);
+            let rms = f32::from_bits(bits);
+            // Normalize: typical speech RMS is 0.01–0.15 for float samples
+            let normalized = (rms * 8.0).min(1.0);
+            let _ = app_for_level.emit("audio-level", serde_json::json!({ "level": normalized }));
+        }
+    });
 
     app.emit("recording-started", ())
         .map_err(|e| e.to_string())?;
@@ -201,6 +244,11 @@ pub async fn start_recording(app: AppHandle, state: State<'_, AppState>) -> Resu
 
 #[tauri::command]
 pub async fn stop_recording(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    // Stop the audio level emitter
+    if let Some(active) = state.level_emitter_active.lock().unwrap().take() {
+        active.store(false, Ordering::Relaxed);
+    }
+
     let handle = state
         .recording
         .lock()

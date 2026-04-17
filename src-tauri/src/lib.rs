@@ -19,6 +19,7 @@ pub struct AppState {
     pub recording: Mutex<Option<audio::capture::RecordingHandle>>,
     pub target_focus: Mutex<Option<FocusTarget>>,
     pub original_volume: Mutex<Option<f32>>,
+    pub level_emitter_active: Mutex<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>,
 }
 
 /// macOS: Checks if the app has Accessibility permission.
@@ -352,6 +353,7 @@ pub fn run() {
             recording: Mutex::new(None),
             target_focus: Mutex::new(None),
             original_volume: Mutex::new(None),
+            level_emitter_active: Mutex::new(None),
         })
         .setup(|app| {
             #[cfg(target_os = "macos")]

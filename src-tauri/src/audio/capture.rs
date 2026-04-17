@@ -1,4 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub struct RecordingHandle {
@@ -6,6 +7,8 @@ pub struct RecordingHandle {
     pub samples: Arc<Mutex<Vec<f32>>>,
     pub sample_rate: u32,
     pub channels: u16,
+    /// Current audio RMS level (f32 bits stored as AtomicU32 for lock-free access)
+    pub current_level: Arc<AtomicU32>,
 }
 
 // cpal::Stream is not Send by default on macOS; we only use it from a single
@@ -32,6 +35,8 @@ pub fn start_capture(max_seconds: u32) -> Result<RecordingHandle, String> {
 
     let samples: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::new()));
     let samples_clone = samples.clone();
+    let current_level: Arc<AtomicU32> = Arc::new(AtomicU32::new(0));
+    let level_clone = current_level.clone();
 
     let stream = device
         .build_input_stream(
@@ -40,6 +45,12 @@ pub fn start_capture(max_seconds: u32) -> Result<RecordingHandle, String> {
                 let mut buf = samples_clone.lock().unwrap();
                 if buf.len() < max_samples {
                     buf.extend_from_slice(data);
+                }
+                // Compute RMS level for real-time visualization
+                if !data.is_empty() {
+                    let sum: f32 = data.iter().map(|s| s * s).sum();
+                    let rms = (sum / data.len() as f32).sqrt();
+                    level_clone.store(rms.to_bits(), Ordering::Relaxed);
                 }
             },
             |err| log::error!("Audio stream error: {}", err),
@@ -54,6 +65,7 @@ pub fn start_capture(max_seconds: u32) -> Result<RecordingHandle, String> {
         samples,
         sample_rate,
         channels,
+        current_level,
     })
 }
 

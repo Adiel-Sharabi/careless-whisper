@@ -23,8 +23,8 @@
       {
         "label": "overlay",
         "title": "",
-        "width": 280,
-        "height": 80,
+        "width": 200,
+        "height": 44,
         "visible": false,
         "decorations": false,
         "alwaysOnTop": true,
