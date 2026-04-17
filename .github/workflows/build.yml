@@ -142,6 +142,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          append_body: true
+          body: |
+
+            May you whisper carelessly!
+            ~ Yariv
+
+            <img width="256" height="256" alt="careless-whisper" src="https://github.com/user-attachments/assets/bde6e505-9564-4267-ae16-1880e9ca269f" />
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.exe
