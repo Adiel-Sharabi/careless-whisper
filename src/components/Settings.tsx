@@ -54,11 +54,15 @@ export function Settings() {
     const unlistenComplete = listen<{ text: string }>("transcription-complete", () => {
       setTranscribingFile(false);
     });
+    const unlistenSettingsUpdated = listen("settings-updated", () => {
+      void invoke<Settings>("get_settings").then(setSettings);
+    });
 
     return () => {
       void unlistenError.then((fn) => fn());
       void unlistenTranscriptionError.then((fn) => fn());
       void unlistenComplete.then((fn) => fn());
+      void unlistenSettingsUpdated.then((fn) => fn());
     };
   }, []);
 
