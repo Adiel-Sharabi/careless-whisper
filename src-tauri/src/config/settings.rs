@@ -29,6 +29,8 @@ pub struct Settings {
     pub overlay_position: OverlayPosition,
     #[serde(default = "default_true")]
     pub lower_volume_while_recording: bool,
+    #[serde(default)]
+    pub translate_to_english: bool,
 }
 
 fn default_true() -> bool {
@@ -47,6 +49,7 @@ impl Default for Settings {
             launch_at_login: false,
             overlay_position: OverlayPosition::TopCenter,
             lower_volume_while_recording: true,
+            translate_to_english: false,
         }
     }
 }

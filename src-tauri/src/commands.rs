@@ -171,12 +171,13 @@ fn emit_transcription_error(app: &AppHandle, message: impl Into<String>) {
 
 fn transcription_inputs(
     state: &State<'_, AppState>,
-) -> (String, bool, Option<FocusTarget>, String, PathBuf) {
+) -> (String, bool, bool, Option<FocusTarget>, String, PathBuf) {
     let settings = state.settings.lock().unwrap().clone();
     let model_path = downloader::model_path(&settings.active_model);
     (
         settings.language,
         settings.auto_paste,
+        settings.translate_to_english,
         state.target_focus.lock().unwrap().clone(),
         settings.active_model,
         model_path,
@@ -188,14 +189,15 @@ fn spawn_transcription(
     samples_16k: Vec<f32>,
     language: String,
     auto_paste: bool,
+    translate_to_english: bool,
     target_focus: Option<FocusTarget>,
     active_model: String,
     model_path: PathBuf,
     hide_overlay_on_finish: bool,
 ) {
     log::info!(
-        "[transcribe] starting: model='{}', language='{}', samples={}, auto_paste={}, target={:?}",
-        active_model, language, samples_16k.len(), auto_paste, target_focus
+        "[transcribe] starting: model='{}', language='{}', translate={}, samples={}, auto_paste={}, target={:?}",
+        active_model, language, translate_to_english, samples_16k.len(), auto_paste, target_focus
     );
 
     tokio::task::spawn_blocking(move || {
@@ -225,7 +227,7 @@ fn spawn_transcription(
             },
         };
 
-        let result = crate::transcribe::whisper::transcribe(&ctx, &samples_16k, &language);
+        let result = crate::transcribe::whisper::transcribe(&ctx, &samples_16k, &language, translate_to_english);
         *state.whisper_ctx.lock().unwrap() = Some(ctx);
 
         match result {
@@ -363,7 +365,7 @@ pub async fn stop_recording(app: AppHandle, state: State<'_, AppState>) -> Resul
 
     let samples_16k =
         crate::audio::resample::resample_to_16k(raw_samples, sample_rate, channels as usize)?;
-    let (language, auto_paste, target_focus, active_model, model_path) =
+    let (language, auto_paste, translate_to_english, target_focus, active_model, model_path) =
         transcription_inputs(&state);
 
     spawn_transcription(
@@ -371,6 +373,7 @@ pub async fn stop_recording(app: AppHandle, state: State<'_, AppState>) -> Resul
         samples_16k,
         language,
         auto_paste,
+        translate_to_english,
         target_focus,
         active_model,
         model_path,
@@ -397,7 +400,7 @@ pub async fn transcribe_audio_file(
     let (samples, sample_rate, channels) = crate::audio::decode::decode_audio_file(&path)?;
     let samples_16k =
         crate::audio::resample::resample_to_16k(samples, sample_rate, channels as usize)?;
-    let (language, _auto_paste, _target_focus, active_model, model_path) =
+    let (language, _auto_paste, translate_to_english, _target_focus, active_model, model_path) =
         transcription_inputs(&state);
 
     spawn_transcription(
@@ -405,6 +408,7 @@ pub async fn transcribe_audio_file(
         samples_16k,
         language,
         false,
+        translate_to_english,
         None,
         active_model,
         model_path,
