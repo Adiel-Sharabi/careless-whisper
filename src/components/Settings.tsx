@@ -15,6 +15,7 @@ interface Settings {
   launch_at_login: boolean;
   overlay_position: "top_center" | "bottom_center" | "top_left" | "top_right";
   lower_volume_while_recording: boolean;
+  translate_to_english: boolean;
 }
 
 const AUDIO_FILE_FILTERS = [
@@ -324,6 +325,16 @@ export function Settings() {
             checked={settings.lower_volume_while_recording}
             onChange={(e) =>
               setSettings({ ...settings, lower_volume_while_recording: e.target.checked })
+            }
+          />
+        </div>
+        <div className="settings-toggle">
+          <span>Translate to English</span>
+          <input
+            type="checkbox"
+            checked={settings.translate_to_english}
+            onChange={(e) =>
+              setSettings({ ...settings, translate_to_english: e.target.checked })
             }
           />
         </div>
