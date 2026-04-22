@@ -23,7 +23,7 @@ pub fn load_model(path: &Path) -> Result<WhisperContext, String> {
     })
 }
 
-pub fn transcribe(ctx: &WhisperContext, samples: &[f32], language: &str) -> Result<String, String> {
+pub fn transcribe(ctx: &WhisperContext, samples: &[f32], language: &str, translate: bool) -> Result<String, String> {
     let mut state = ctx.create_state().map_err(|e| format!("{:?}", e))?;
 
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
@@ -31,6 +31,7 @@ pub fn transcribe(ctx: &WhisperContext, samples: &[f32], language: &str) -> Resu
     params.set_print_realtime(false);
     params.set_print_timestamps(false);
     params.set_single_segment(false);
+    params.set_translate(translate);
 
     // "auto" → empty string triggers whisper.cpp auto-detect
     if language != "auto" && !language.is_empty() {
