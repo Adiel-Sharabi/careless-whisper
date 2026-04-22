@@ -115,25 +115,75 @@ pub fn get_frontmost_target() -> Option<FocusTarget> {
 pub fn paste_into_target(target: FocusTarget) -> Result<(), String> {
     use std::mem;
     use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
     use windows::Win32::UI::Input::KeyboardAndMouse::*;
-    use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId, IsWindow, SetForegroundWindow,
+    };
 
-    // Bring the target window back to the foreground.
-    // SendInput an Alt press first to satisfy SetForegroundWindow restrictions.
-    unsafe {
-        let mut alt_inputs: [INPUT; 2] = mem::zeroed();
-        alt_inputs[0].r#type = INPUT_KEYBOARD;
-        alt_inputs[0].Anonymous.ki.wVk = VK_MENU;
-        alt_inputs[1].r#type = INPUT_KEYBOARD;
-        alt_inputs[1].Anonymous.ki.wVk = VK_MENU;
-        alt_inputs[1].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
-        SendInput(&alt_inputs, mem::size_of::<INPUT>() as i32);
+    let hwnd = HWND(target as *mut _);
 
-        let hwnd = HWND(target as *mut _);
-        let _ = SetForegroundWindow(hwnd);
+    // Validate the target window is still alive
+    if unsafe { IsWindow(hwnd) }.0 == 0 {
+        return Err(format!(
+            "Target window (HWND {}) is no longer valid — it may have been closed",
+            target
+        ));
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(100));
+    unsafe {
+        let our_thread = GetCurrentThreadId();
+        let fg_hwnd = GetForegroundWindow();
+        let fg_thread = GetWindowThreadProcessId(fg_hwnd, None);
+        let target_thread = GetWindowThreadProcessId(hwnd, None);
+
+        log::info!(
+            "[paste] our_thread={}, fg_thread={}, target_thread={}, target_hwnd={}",
+            our_thread, fg_thread, target_thread, target
+        );
+
+        // Attach our thread to the foreground window's thread so we gain
+        // permission to call SetForegroundWindow reliably.
+        let attached_fg = if our_thread != fg_thread && fg_thread != 0 {
+            AttachThreadInput(our_thread, fg_thread, true).0 != 0
+        } else {
+            false
+        };
+        let attached_target = if our_thread != target_thread && target_thread != fg_thread && target_thread != 0 {
+            AttachThreadInput(our_thread, target_thread, true).0 != 0
+        } else {
+            false
+        };
+
+        // AttachThreadInput above gives us permission to call SetForegroundWindow
+        // without the old Alt-key hack (which activated menu bars in apps like Notepad).
+        let fg_ok = SetForegroundWindow(hwnd);
+        if fg_ok.0 == 0 {
+            log::warn!("[paste] SetForegroundWindow failed for HWND {}", target);
+        } else {
+            log::info!("[paste] SetForegroundWindow succeeded for HWND {}", target);
+        }
+
+        // Detach threads
+        if attached_fg {
+            let _ = AttachThreadInput(our_thread, fg_thread, false);
+        }
+        if attached_target {
+            let _ = AttachThreadInput(our_thread, target_thread, false);
+        }
+    }
+
+    std::thread::sleep(std::time::Duration::from_millis(150));
+
+    // Verify the target is actually foreground before sending Ctrl+V
+    let actual_fg = unsafe { GetForegroundWindow() };
+    if actual_fg != hwnd {
+        log::warn!(
+            "[paste] target HWND {} is not foreground (actual={}), Ctrl+V may go to wrong window",
+            target,
+            actual_fg.0 as isize
+        );
+    }
 
     // Send Ctrl+V
     unsafe {

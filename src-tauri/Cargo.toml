@@ -43,6 +43,11 @@ objc2 = "0.6"
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
 
+# Optimize the whole dev build — whisper transcription and resampling are
+# unusably slow at opt-level 0. This keeps debug info but enables optimizations.
+[profile.dev]
+opt-level = 2
+
 [dev-dependencies]
 hound = "3.5"
 tempfile = "3"
@@ -55,4 +60,5 @@ windows = { version = "0.58", features = [
     "Win32_Media_Audio",
     "Win32_Media_Audio_Endpoints",
     "Win32_System_Com",
+    "Win32_System_Threading",
 ] }

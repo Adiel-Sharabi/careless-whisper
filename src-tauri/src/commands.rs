@@ -235,7 +235,14 @@ fn spawn_transcription(
                 // Save the user's clipboard before overwriting it
                 let previous_clipboard = crate::output::clipboard::read_clipboard();
 
-                let _ = crate::output::clipboard::copy_to_clipboard(text);
+                let clipboard_ok = match crate::output::clipboard::copy_to_clipboard(text) {
+                    Ok(()) => true,
+                    Err(e) => {
+                        log::error!("[clipboard] failed: {}", e);
+                        emit_transcription_error(&app, format!("Clipboard error: {}", e));
+                        false
+                    }
+                };
 
                 if hide_overlay_on_finish {
                     hide_overlay(&app);
@@ -246,7 +253,7 @@ fn spawn_transcription(
                     serde_json::json!({ "text": text }),
                 );
 
-                if auto_paste {
+                if clipboard_ok && auto_paste {
                     if let Some(target) = target_focus {
                         match crate::output::paste::paste_into_target(target) {
                             Ok(()) => {
@@ -258,9 +265,11 @@ fn spawn_transcription(
                             }
                             Err(error) => {
                                 // Paste failed — keep transcription on clipboard so user can Cmd+V manually
-                                log::warn!("[paste error] {}", error);
+                                log::error!("[paste] failed: {}", error);
                             }
                         }
+                    } else {
+                        log::warn!("[paste] no target window captured — skipping paste");
                     }
                 }
             }
