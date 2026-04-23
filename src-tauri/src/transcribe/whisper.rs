@@ -30,8 +30,23 @@ pub fn transcribe(ctx: &WhisperContext, samples: &[f32], language: &str, transla
     params.set_print_progress(false);
     params.set_print_realtime(false);
     params.set_print_timestamps(false);
-    params.set_single_segment(false);
+    params.set_token_timestamps(false);
     params.set_translate(translate);
+
+    let n_threads = std::thread::available_parallelism()
+        .map(|n| n.get().min(16) as i32)
+        .unwrap_or(4);
+    params.set_n_threads(n_threads);
+
+    let duration_secs = samples.len() as f32 / 16000.0;
+    let single_segment = duration_secs < 30.0;
+    params.set_single_segment(single_segment);
+
+    let lang_label = if language == "auto" || language.is_empty() { "auto" } else { language };
+    log::info!(
+        "[whisper] transcribing {:.1}s audio | threads={} | language={} | single_segment={}",
+        duration_secs, n_threads, lang_label, single_segment
+    );
 
     // "auto" → empty string triggers whisper.cpp auto-detect
     if language != "auto" && !language.is_empty() {
