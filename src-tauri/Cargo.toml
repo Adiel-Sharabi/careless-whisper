@@ -1,8 +1,9 @@
 [package]
 name = "careless-whisper"
-version = "0.5.5"
+version = "0.5.7"
 description = "Local voice-to-text transcription"
 authors = []
+default-run = "careless-whisper"
 edition = "2021"
 
 [lib]
