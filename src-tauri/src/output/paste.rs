@@ -34,7 +34,7 @@ pub fn get_frontmost_target() -> Option<FocusTarget> {
 
 /// Activates the target app and simulates Cmd+V via CoreGraphics CGEventPostToPid.
 #[cfg(target_os = "macos")]
-pub fn paste_into_target(target: FocusTarget) -> Result<(), String> {
+pub fn paste_into_target(target: FocusTarget, _text: &str) -> Result<(), String> {
     use objc2::msg_send;
     use objc2::runtime::AnyClass;
     use std::os::raw::c_void;
@@ -110,9 +110,18 @@ pub fn get_frontmost_target() -> Option<FocusTarget> {
     }
 }
 
-/// Activates the target window and simulates Ctrl+V via SendInput.
+/// Activates the target window and injects the transcribed text.
+///
+/// Uses `KEYEVENTF_UNICODE` to inject each character as a unicode code point
+/// rather than synthesizing Ctrl+V. Ctrl+V via SendInput fails when the
+/// foreground thread's keyboard layout is non-Latin (e.g. Hebrew) because
+/// some apps don't accept Ctrl+V at all under those layouts — even a
+/// human pressing Ctrl+V on the physical keyboard does nothing in that
+/// state. Unicode injection bypasses all keyboard-shortcut handling and
+/// just delivers the characters as if they had been typed (or pasted by
+/// an IME), so it works regardless of the active layout.
 #[cfg(target_os = "windows")]
-pub fn paste_into_target(target: FocusTarget) -> Result<(), String> {
+pub fn paste_into_target(target: FocusTarget, text: &str) -> Result<(), String> {
     use std::mem;
     use windows::Win32::Foundation::HWND;
     use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
@@ -185,47 +194,39 @@ pub fn paste_into_target(target: FocusTarget) -> Result<(), String> {
         );
     }
 
-    // Send Ctrl+V using BOTH virtual key and scan code. KEYEVENTF_SCANCODE
-    // makes the hardware event layout-independent, but Windows still derives
-    // the wParam (virtual key) of the resulting WM_KEYDOWN from the scan code
-    // through the foreground thread's keyboard layout — so on non-Latin
-    // layouts (e.g. Hebrew) some apps see a wParam other than VK_V and the
-    // keystroke fails to register as the paste accelerator. Setting wVk
-    // explicitly forces the correct virtual key in wParam regardless of the
-    // active layout.
-    const SCAN_LCTRL: u16 = 0x1D;
-    const SCAN_V: u16 = 0x2F;
-    unsafe {
-        let mut inputs: [INPUT; 4] = mem::zeroed();
+    // Inject each character as a unicode code point. Each char becomes a
+    // (key-down, key-up) pair; surrogate pairs in the BMP are sent as two
+    // events for the high and low surrogates respectively (UTF-16 already
+    // gives us this naturally). SendInput accepts the whole batch in one
+    // call so the cost is one syscall regardless of text length.
+    let utf16: Vec<u16> = text.encode_utf16().collect();
+    if utf16.is_empty() {
+        return Ok(());
+    }
 
-        // Ctrl down
-        inputs[0].r#type = INPUT_KEYBOARD;
-        inputs[0].Anonymous.ki.wVk = VK_LCONTROL;
-        inputs[0].Anonymous.ki.wScan = SCAN_LCTRL;
-        inputs[0].Anonymous.ki.dwFlags = KEYEVENTF_SCANCODE;
+    let mut inputs: Vec<INPUT> = Vec::with_capacity(utf16.len() * 2);
+    for &unit in &utf16 {
+        let mut down: INPUT = unsafe { mem::zeroed() };
+        down.r#type = INPUT_KEYBOARD;
+        down.Anonymous.ki.wScan = unit;
+        down.Anonymous.ki.dwFlags = KEYEVENTF_UNICODE;
 
-        // V down
-        inputs[1].r#type = INPUT_KEYBOARD;
-        inputs[1].Anonymous.ki.wVk = VK_V;
-        inputs[1].Anonymous.ki.wScan = SCAN_V;
-        inputs[1].Anonymous.ki.dwFlags = KEYEVENTF_SCANCODE;
+        let mut up: INPUT = unsafe { mem::zeroed() };
+        up.r#type = INPUT_KEYBOARD;
+        up.Anonymous.ki.wScan = unit;
+        up.Anonymous.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
 
-        // V up
-        inputs[2].r#type = INPUT_KEYBOARD;
-        inputs[2].Anonymous.ki.wVk = VK_V;
-        inputs[2].Anonymous.ki.wScan = SCAN_V;
-        inputs[2].Anonymous.ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
+        inputs.push(down);
+        inputs.push(up);
+    }
 
-        // Ctrl up
-        inputs[3].r#type = INPUT_KEYBOARD;
-        inputs[3].Anonymous.ki.wVk = VK_LCONTROL;
-        inputs[3].Anonymous.ki.wScan = SCAN_LCTRL;
-        inputs[3].Anonymous.ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
-
-        let sent = SendInput(&inputs, mem::size_of::<INPUT>() as i32);
-        if sent != 4 {
-            return Err(format!("SendInput sent {} of 4 events", sent));
-        }
+    let expected = inputs.len() as u32;
+    let sent = unsafe { SendInput(&inputs, mem::size_of::<INPUT>() as i32) };
+    if sent != expected {
+        return Err(format!(
+            "SendInput sent {} of {} events ({} UTF-16 code units)",
+            sent, expected, utf16.len()
+        ));
     }
 
     std::thread::sleep(std::time::Duration::from_millis(50));
@@ -276,7 +277,7 @@ pub fn get_frontmost_target() -> Option<FocusTarget> {
 /// - If we only have the "wayland" marker, uses the Wayland paste fallback
 ///   chain (ydotool → wtype → xdotool).
 #[cfg(target_os = "linux")]
-pub fn paste_into_target(target: FocusTarget) -> Result<(), String> {
+pub fn paste_into_target(target: FocusTarget, _text: &str) -> Result<(), String> {
     if target == "wayland" {
         return paste_wayland();
     }
