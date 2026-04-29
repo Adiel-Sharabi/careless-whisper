@@ -342,6 +342,21 @@ fn spawn_transcription(
             Ok(ref text) => {
                 log::info!("[transcribe] result ({} chars): {:?}", text.len(), &text[..text.len().min(100)]);
 
+                // Whisper sometimes returns nothing for short/quiet/noisy audio (after
+                // suppress_non_speech_tokens + annotation filter). Don't stomp the user's
+                // clipboard or paste-spam in that case — just hide the overlay and bail.
+                if text.trim().is_empty() {
+                    log::info!("[transcribe] empty result — skipping clipboard/paste");
+                    if hide_overlay_on_finish {
+                        hide_overlay(&app);
+                    }
+                    let _ = app.emit(
+                        "transcription-complete",
+                        serde_json::json!({ "text": "" }),
+                    );
+                    return;
+                }
+
                 // Save the user's clipboard before overwriting it
                 let previous_clipboard = crate::output::clipboard::read_clipboard();
 
