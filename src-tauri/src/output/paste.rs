@@ -185,12 +185,14 @@ pub fn paste_into_target(target: FocusTarget) -> Result<(), String> {
         );
     }
 
-    // Send Ctrl+V using SCAN CODES (KEYEVENTF_SCANCODE) so the keystroke is
-    // layout-independent. Sending wVk=VK_V breaks when the foreground thread
-    // is on a non-Latin keyboard layout (e.g. user switched to Hebrew between
-    // hotkey-stop and transcribe-complete) — the receiving app then interprets
-    // the virtual key under the active layout and Ctrl+V is no longer the paste
-    // accelerator. Physical scan codes (LCtrl=0x1D, V=0x2F) bypass that.
+    // Send Ctrl+V using BOTH virtual key and scan code. KEYEVENTF_SCANCODE
+    // makes the hardware event layout-independent, but Windows still derives
+    // the wParam (virtual key) of the resulting WM_KEYDOWN from the scan code
+    // through the foreground thread's keyboard layout — so on non-Latin
+    // layouts (e.g. Hebrew) some apps see a wParam other than VK_V and the
+    // keystroke fails to register as the paste accelerator. Setting wVk
+    // explicitly forces the correct virtual key in wParam regardless of the
+    // active layout.
     const SCAN_LCTRL: u16 = 0x1D;
     const SCAN_V: u16 = 0x2F;
     unsafe {
@@ -198,21 +200,25 @@ pub fn paste_into_target(target: FocusTarget) -> Result<(), String> {
 
         // Ctrl down
         inputs[0].r#type = INPUT_KEYBOARD;
+        inputs[0].Anonymous.ki.wVk = VK_LCONTROL;
         inputs[0].Anonymous.ki.wScan = SCAN_LCTRL;
         inputs[0].Anonymous.ki.dwFlags = KEYEVENTF_SCANCODE;
 
         // V down
         inputs[1].r#type = INPUT_KEYBOARD;
+        inputs[1].Anonymous.ki.wVk = VK_V;
         inputs[1].Anonymous.ki.wScan = SCAN_V;
         inputs[1].Anonymous.ki.dwFlags = KEYEVENTF_SCANCODE;
 
         // V up
         inputs[2].r#type = INPUT_KEYBOARD;
+        inputs[2].Anonymous.ki.wVk = VK_V;
         inputs[2].Anonymous.ki.wScan = SCAN_V;
         inputs[2].Anonymous.ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
 
         // Ctrl up
         inputs[3].r#type = INPUT_KEYBOARD;
+        inputs[3].Anonymous.ki.wVk = VK_LCONTROL;
         inputs[3].Anonymous.ki.wScan = SCAN_LCTRL;
         inputs[3].Anonymous.ki.dwFlags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP;
 

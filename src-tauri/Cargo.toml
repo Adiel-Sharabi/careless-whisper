@@ -4,6 +4,7 @@ version = "0.5.9"
 description = "Local voice-to-text transcription"
 authors = []
 edition = "2021"
+default-run = "careless-whisper"
 
 [lib]
 name = "careless_whisper_lib"
